@@ -46,7 +46,7 @@ static_sites:
       - path: /
 
     # Error document
-    error_document: /html/404.html
+    error_document: html/404.html
 
 # Features
 features:
