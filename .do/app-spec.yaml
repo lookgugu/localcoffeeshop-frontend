@@ -1,0 +1,53 @@
+# DigitalOcean App Platform Spec for localcoffeeshop-frontend
+# Static site deployment
+
+name: localcoffeeshop-frontend
+region: nyc
+
+# Custom domains
+domains:
+  - domain: localcoffeeshop.co
+    type: PRIMARY
+    zone: localcoffeeshop.co
+
+# Static site
+static_sites:
+  - name: frontend
+    github:
+      repo: lookgugu/localcoffeeshop-frontend
+      branch: main
+      deploy_on_push: true
+
+    source_dir: /
+
+    # Build configuration
+    build_command: npm run build
+
+    # Output directory
+    output_dir: public
+
+    # Environment variables for build
+    envs:
+      - key: NODE_ENV
+        value: production
+        scope: BUILD_TIME
+
+      - key: API_BASE_URL
+        value: https://api.localcoffeeshop.co/api/v1
+        scope: BUILD_TIME
+
+      - key: GA_MEASUREMENT_ID
+        value: G-YVSXN7PM48
+        scope: BUILD_TIME
+        type: SECRET
+
+    # Routes - SPA-like behavior
+    routes:
+      - path: /
+
+    # Error document
+    error_document: /html/404.html
+
+# Features
+features:
+  - buildpack-stack=ubuntu-22
