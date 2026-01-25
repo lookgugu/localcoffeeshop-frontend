@@ -1,0 +1,33 @@
+/* Coffee Shops List */
+.coffee-shops {
+    padding: 2rem 0;
+}
+
+.coffee-shop-card {
+    padding: 1.5rem 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.coffee-shop-card:last-child {
+    border-bottom: none;
+}
+
+.coffee-shop-card h3 {
+    font-size: 1.2rem;
+    margin-bottom: 0.5rem;
+    color: var(--primary);
+}
+
+.rating {
+    color: #666;
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+}
+
+.features {
+    display: flex;
+    gap: 1rem;
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+    color: #666;
+} 

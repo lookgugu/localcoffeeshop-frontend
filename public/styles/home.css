@@ -1,0 +1,182 @@
+/* Search Section */
+.search-section {
+    padding: 2rem 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.search-container {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.search-input {
+    flex: 1;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+.search-button {
+    padding: 0.75rem 1.5rem;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+/* Menu Section */
+.menu-section {
+    background-color: #f8f9fa;
+    padding: 2rem 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.menu-grid {
+    display: flex;
+    gap: 2rem;
+    margin-top: 1.5rem;
+}
+
+.menu-column {
+    position: relative;
+}
+
+.menu-column h3 {
+    color: var(--primary);
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+}
+
+.menu-column h3:hover {
+    background-color: #e9ecef;
+}
+
+.menu-column .dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    min-width: 200px;
+    z-index: 1000;
+}
+
+.menu-column:hover .dropdown {
+    display: block;
+}
+
+.menu-column a {
+    color: #666;
+    text-decoration: none;
+    font-size: 0.9rem;
+    padding: 0.5rem 1rem;
+    display: block;
+    transition: background-color 0.2s ease;
+}
+
+.menu-column a:hover {
+    color: var(--hover);
+    background-color: #f8f9fa;
+}
+
+.view-all {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.9rem;
+    padding: 0.5rem 1rem;
+    display: block;
+    border-top: 1px solid var(--border);
+    margin-top: 0.5rem;
+}
+
+.view-all:hover {
+    color: var(--hover);
+    background-color: #f8f9fa;
+}
+
+/* Featured Section */
+.featured {
+    padding: 2rem 0;
+}
+
+.section-title {
+    margin-bottom: 2rem;
+}
+
+.section-title h2 {
+    font-size: 1.5rem;
+    color: var(--primary);
+    margin-bottom: 0.5rem;
+}
+
+.section-title p {
+    color: #666;
+}
+
+.coffee-shop-card {
+    padding: 1.5rem 0;
+    border-bottom: 1px solid var(--border);
+}
+
+.coffee-shop-card:last-child {
+    border-bottom: none;
+}
+
+.coffee-shop-card h3 {
+    font-size: 1.2rem;
+    margin-bottom: 0.5rem;
+    color: var(--primary);
+}
+
+.rating {
+    color: #666;
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+}
+
+.features {
+    display: flex;
+    gap: 1rem;
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+    color: #666;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .search-container {
+        flex-direction: column;
+    }
+
+    .search-button {
+        width: 100%;
+    }
+
+    .menu-grid {
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .menu-column .dropdown {
+        position: static;
+        border: none;
+        box-shadow: none;
+        display: none;
+    }
+
+    .menu-column.active .dropdown {
+        display: block;
+    }
+} 

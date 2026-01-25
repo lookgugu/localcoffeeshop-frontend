@@ -1,0 +1,28 @@
+{
+  "name": "localcoffeeshop-frontend",
+  "version": "1.0.0",
+  "description": "Frontend for Local Coffee Shop directory",
+  "main": "public/frontend.js",
+  "scripts": {
+    "dev": "npm run build:config && http-server public -p 8080 -c-1",
+    "build": "npm run build:config && npm run build:js && npm run build:css",
+    "build:config": "node scripts/inject-config.js",
+    "build:js": "mkdir -p public/dist && npx terser public/frontend.js -o public/dist/app.min.js -c -m && npx terser public/constants.js -o public/dist/constants.min.js -c -m && npx terser public/html/state.js -o public/dist/state.min.js -c -m",
+    "build:css": "npx clean-css-cli -o public/dist/styles.min.css styles.css public/styles/about.css public/styles/common.css public/styles/features.css public/styles/home.css public/styles/states.css",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "clean-css-cli": "^5.6.3",
+    "http-server": "^14.1.1",
+    "terser": "^5.31.0"
+  },
+  "keywords": [
+    "coffee",
+    "directory",
+    "frontend",
+    "vanilla-js"
+  ],
+  "author": "",
+  "license": "MIT"
+}

@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Submit Coffee Shop - Local Coffee Shops</title>
+    <link rel="stylesheet" href="../styles.css">
+    <link rel="stylesheet" href="../submit-styles.css">
+    <script src="/config.js"></script>
+    <script src="../analytics.js" async></script>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="back-button">← Back to Home</a>
+        <h1>Submit Coffee Shop</h1>
+
+        <div class="tabs">
+            <div class="tab active" data-tab="add">Add New Coffee Shop</div>
+            <div class="tab" data-tab="update">Update Existing Coffee Shop</div>
+        </div>
+
+        <div class="tab-content active" id="add-tab">
+            <div class="form-container">
+                <div class="success-message" id="add-success">Coffee shop added successfully!</div>
+                <div class="error-message" id="add-error"></div>
+
+                <form id="add-form">
+                    <div class="form-group">
+                        <label for="shop-name">Coffee Shop Name</label>
+                        <input type="text" id="shop-name" required>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="shop-state">State</label>
+                            <select id="shop-state" required>
+                                <option value="">Select a state</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="shop-city">City</label>
+                            <input type="text" id="shop-city" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="shop-address">Street Address</label>
+                        <input type="text" id="shop-address" required>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="shop-zip">ZIP Code</label>
+                            <input type="text" id="shop-zip" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="shop-phone">Phone Number</label>
+                            <input type="tel" id="shop-phone">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="shop-website">Website</label>
+                        <input type="url" id="shop-website">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Price Level</label>
+                        <div class="radio-group">
+                            <div class="radio-option">
+                                <input type="radio" id="price-inexpensive" name="price-level" value="PRICE_LEVEL_INEXPENSIVE">
+                                <label for="price-inexpensive">Inexpensive</label>
+                            </div>
+                            <div class="radio-option">
+                                <input type="radio" id="price-moderate" name="price-level" value="PRICE_LEVEL_MODERATE">
+                                <label for="price-moderate">Moderate</label>
+                            </div>
+                            <div class="radio-option">
+                                <input type="radio" id="price-expensive" name="price-level" value="PRICE_LEVEL_EXPENSIVE">
+                                <label for="price-expensive">Expensive</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="shop-description">Description</label>
+                        <textarea id="shop-description"></textarea>
+                    </div>
+
+                    <div class="button-group">
+                        <button type="submit" class="submit-button">Add Coffee Shop</button>
+                        <button type="button" class="cancel-button" onclick="resetForm('add-form')">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="tab-content" id="update-tab">
+            <div class="form-container">
+                <div class="success-message" id="update-success">Coffee shop updated successfully!</div>
+                <div class="error-message" id="update-error"></div>
+
+                <div class="form-group">
+                    <label for="search-shop">Search for a coffee shop to update</label>
+                    <input type="text" id="search-shop" placeholder="Enter coffee shop name...">
+                </div>
+
+                <div class="search-results" id="search-results">
+                    <!-- Search results will be populated here -->
+                </div>
+
+                <form id="update-form" style="display: none;">
+                    <input type="hidden" id="shop-id">
+
+                    <div class="form-group">
+                        <label for="update-name">Coffee Shop Name</label>
+                        <input type="text" id="update-name" required>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="update-state">State</label>
+                            <select id="update-state" required>
+                                <option value="">Select a state</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="update-city">City</label>
+                            <input type="text" id="update-city" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="update-address">Street Address</label>
+                        <input type="text" id="update-address" required>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="update-zip">ZIP Code</label>
+                            <input type="text" id="update-zip" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="update-phone">Phone Number</label>
+                            <input type="tel" id="update-phone">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="update-website">Website</label>
+                        <input type="url" id="update-website">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Price Level</label>
+                        <div class="radio-group">
+                            <div class="radio-option">
+                                <input type="radio" id="update-price-inexpensive" name="update-price-level" value="PRICE_LEVEL_INEXPENSIVE">
+                                <label for="update-price-inexpensive">Inexpensive</label>
+                            </div>
+                            <div class="radio-option">
+                                <input type="radio" id="update-price-moderate" name="update-price-level" value="PRICE_LEVEL_MODERATE">
+                                <label for="update-price-moderate">Moderate</label>
+                            </div>
+                            <div class="radio-option">
+                                <input type="radio" id="update-price-expensive" name="update-price-level" value="PRICE_LEVEL_EXPENSIVE">
+                                <label for="update-price-expensive">Expensive</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="update-description">Description</label>
+                        <textarea id="update-description"></textarea>
+                    </div>
+
+                    <div class="button-group">
+                        <button type="submit" class="submit-button">Update Coffee Shop</button>
+                        <button type="button" class="cancel-button" onclick="resetForm('update-form')">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="../submit.js"></script>
+</body>
+</html>

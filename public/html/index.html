@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Discover local coffee shops across the United States. Search by state, city, and price level. Find the best local cafes near you.">
+    <meta name="keywords" content="coffee shops, local coffee, cafes, coffee near me, US coffee shops, coffee directory">
+    <meta name="author" content="Local Coffee Shops">
+    <meta name="robots" content="index, follow">
+    <title>Local Coffee Shops - Find Coffee Shops by State | US Coffee Directory</title>
+
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://localcoffeeshop.co/">
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://localcoffeeshop.co/">
+    <meta property="og:title" content="Local Coffee Shops - Find Coffee Shops by State">
+    <meta property="og:description" content="Discover local coffee shops across the United States. Search by state, city, and price level.">
+    <meta property="og:site_name" content="Local Coffee Shops">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Local Coffee Shops - Find Coffee Shops by State">
+    <meta name="twitter:description" content="Discover local coffee shops across the United States. Search by state, city, and price level.">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+
+    <!-- Configuration (generated at build time) -->
+    <script src="/config.js"></script>
+
+    <!-- Dynamic Asset Loader -->
+    <script src="/asset-loader.js"></script>
+
+    <!-- Schema.org JSON-LD -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "Local Coffee Shops",
+        "url": "https://localcoffeeshop.co/",
+        "description": "Discover local coffee shops across the United States. Search by state, city, and price level.",
+        "potentialAction": {
+            "@type": "SearchAction",
+            "target": "https://localcoffeeshop.co/?q={search_term_string}",
+            "query-input": "required name=search_term_string"
+        }
+    }
+    </script>
+</head>
+<body>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+
+    <main id="main-content" class="container">
+        <h1>US Coffee Shops by State</h1>
+
+        <!-- Server status indicator -->
+        <div id="serverStatus" class="server-status" style="display: none;" role="alert" aria-live="polite">
+            <p>⚠️ Unable to connect to the server. Please try again later or contact support if the problem persists.</p>
+        </div>
+
+        <!-- Search functionality -->
+        <div class="search-container" role="search" aria-label="Coffee shop search">
+            <label for="searchInput" class="visually-hidden">Search by name or city</label>
+            <input
+                type="text"
+                id="searchInput"
+                placeholder="Search by name or city..."
+                aria-label="Search by coffee shop name or city"
+                autocomplete="off">
+
+            <label for="stateFilter" class="visually-hidden">Filter by state</label>
+            <select id="stateFilter" aria-label="Filter by state">
+                <option value="">All States</option>
+            </select>
+
+            <label for="priceFilter" class="visually-hidden">Filter by price level</label>
+            <select id="priceFilter" aria-label="Filter by price level">
+                <option value="">All Prices</option>
+                <option value="PRICE_LEVEL_INEXPENSIVE">Inexpensive ($)</option>
+                <option value="PRICE_LEVEL_MODERATE">Moderate ($$)</option>
+                <option value="PRICE_LEVEL_EXPENSIVE">Expensive ($$$)</option>
+            </select>
+
+            <button id="findNearMe" class="button-secondary" aria-label="Find coffee shops near me">Find Near Me</button>
+            <a href="submit.html" class="submit-link" aria-label="Submit a new coffee shop">Submit a Coffee Shop</a>
+        </div>
+
+        <!-- Search results -->
+        <section
+            id="searchResults"
+            class="coffee-list"
+            style="display: none;"
+            aria-live="polite"
+            aria-label="Search results">
+            <h2>Search Results</h2>
+            <!-- Results will be populated here -->
+        </section>
+
+        <!-- State grid -->
+        <section
+            class="state-grid"
+            id="stateGrid"
+            role="grid"
+            aria-label="Browse coffee shops by state. Use arrow keys to navigate between states.">
+            <!-- States will be populated by JavaScript -->
+            <div class="loading-indicator" role="status" aria-live="polite">
+                <span class="visually-hidden">Loading states from database...</span>
+                Loading states from database...
+            </div>
+        </section>
+    </main>
+</body>
+</html> 

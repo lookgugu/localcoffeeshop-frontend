@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local Coffee Shops</title>
+    <link rel="stylesheet" href="../styles.css">
+    <script src="/config.js"></script>
+    <script src="../analytics.js" async></script>
+    <style>
+        .search-container {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f5f5f5;
+            border-radius: 8px;
+        }
+
+        .search-container input,
+        .search-container select {
+            padding: 10px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+
+        .search-container input[type="text"] {
+            width: 300px;
+        }
+
+        .search-results {
+            margin-top: 20px;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Local Coffee Shops</h1>
+        
+        <div class="search-container">
+            <input type="text" id="searchInput" placeholder="Search by name or city...">
+            <select id="stateFilter">
+                <option value="">All States</option>
+            </select>
+            <select id="priceFilter">
+                <option value="">All Prices</option>
+                <option value="PRICE_LEVEL_INEXPENSIVE">Inexpensive</option>
+                <option value="PRICE_LEVEL_MODERATE">Moderate</option>
+                <option value="PRICE_LEVEL_EXPENSIVE">Expensive</option>
+            </select>
+        </div>
+
+        <div id="searchResults" class="coffee-list">
+            <!-- Results will be populated here -->
+        </div>
+    </div>
+
+    <script>
+        let allCoffeeShops = [];
+        let states = new Set();
+
+        // Function to get price level class (reused from state pages)
+        function getPriceLevelClass(priceLevel) {
+            if (!priceLevel) return '';
+            switch (priceLevel) {
+                case 'PRICE_LEVEL_INEXPENSIVE':
+                    return 'inexpensive';
+                case 'PRICE_LEVEL_MODERATE':
+                    return 'moderate';
+                case 'PRICE_LEVEL_EXPENSIVE':
+                    return 'expensive';
+                default:
+                    return '';
+            }
+        }
+
+        // Function to format price level text (reused from state pages)
+        function formatPriceLevel(priceLevel) {
+            if (!priceLevel) return '';
+            return priceLevel.replace('PRICE_LEVEL_', '').toLowerCase();
+        }
+
+        // Function to extract state code from filename
+        function getStateFromFilename(filename) {
+            const match = filename.match(/state_([a-z]{2})\.json$/);
+            return match ? match[1].toUpperCase() : null;
+        }
+
+        // Function to load all coffee shops
+        async function loadAllCoffeeShops() {
+            const searchResults = document.getElementById('searchResults');
+            searchResults.innerHTML = '<div class="loading">Loading coffee shops...</div>';
+
+            try {
+                const response = await fetch('state_files.json');
+                const stateFiles = await response.json();
+                
+                for (const file of stateFiles) {
+                    if (file.endsWith('.json')) {
+                        const stateCode = getStateFromFilename(file);
+                        if (stateCode) {
+                            try {
+                                const stateResponse = await fetch(file);
+                                const stateShops = await stateResponse.json();
+                                stateShops.forEach(shop => {
+                                    shop.state = stateCode;
+                                });
+                                allCoffeeShops = allCoffeeShops.concat(stateShops);
+                                states.add(stateCode);
+                            } catch (error) {
+                                console.error(`Error loading ${file}:`, error);
+                            }
+                        }
+                    }
+                }
+
+                // Populate state filter
+                const stateFilter = document.getElementById('stateFilter');
+                Array.from(states).sort().forEach(state => {
+                    const option = document.createElement('option');
+                    option.value = state;
+                    option.textContent = state;
+                    stateFilter.appendChild(option);
+                });
+
+                // Initial search
+                searchCoffeeShops();
+            } catch (error) {
+                console.error('Error loading coffee shops:', error);
+                searchResults.innerHTML = '<div class="no-results">Error loading coffee shops</div>';
+            }
+        }
+
+        // Function to search and filter coffee shops
+        function searchCoffeeShops() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const selectedState = document.getElementById('stateFilter').value;
+            const selectedPrice = document.getElementById('priceFilter').value;
+            
+            const filteredShops = allCoffeeShops.filter(shop => {
+                const matchesSearch = shop.displayName.text.toLowerCase().includes(searchTerm);
+                const matchesState = !selectedState || shop.state === selectedState;
+                const matchesPrice = !selectedPrice || shop.priceLevel === selectedPrice;
+                return matchesSearch && matchesState && matchesPrice;
+            });
+
+            displayResults(filteredShops);
+        }
+
+        // Function to display search results
+        function displayResults(shops) {
+            const searchResults = document.getElementById('searchResults');
+            
+            if (shops.length === 0) {
+                searchResults.innerHTML = '<div class="no-results">No coffee shops found</div>';
+                return;
+            }
+
+            searchResults.innerHTML = '';
+            shops.forEach(shop => {
+                const li = document.createElement('li');
+                li.className = 'coffee-item';
+                
+                li.innerHTML = `
+                    <h3>${shop.displayName.text}</h3>
+                    <p>${shop.formattedAddress}</p>
+                    <p class="state-tag">${shop.state}</p>
+                    ${shop.priceLevel ? `
+                        <span class="price-level ${getPriceLevelClass(shop.priceLevel)}">
+                            ${formatPriceLevel(shop.priceLevel)}
+                        </span>
+                    ` : ''}
+                `;
+                
+                searchResults.appendChild(li);
+            });
+        }
+
+        // Add event listeners
+        document.getElementById('searchInput').addEventListener('input', searchCoffeeShops);
+        document.getElementById('stateFilter').addEventListener('change', searchCoffeeShops);
+        document.getElementById('priceFilter').addEventListener('change', searchCoffeeShops);
+
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', loadAllCoffeeShops);
+    </script>
+</body>
+</html> 

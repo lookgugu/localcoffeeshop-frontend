@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>US Coffee Shops by State | Coffee Directory</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Source+Sans+Pro:wght@400;600&family=Pacifico&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #3A2618;
+            --secondary: #F5E8C7;
+            --accent: #D35400;
+            --background: #FCFAF7;
+            --text: #2C3E50;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Source Sans Pro', sans-serif;
+            line-height: 1.6;
+            color: var(--text);
+            background-color: var(--background);
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            font-family: 'Playfair Display', serif;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 1rem;
+        }
+
+        /* Navigation */
+        .navbar {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+
+        .nav-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+        }
+
+        .logo {
+            font-family: 'Pacifico', cursive;
+            font-size: 1.8rem;
+            color: var(--primary);
+            text-decoration: none;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: var(--text);
+            font-weight: 600;
+            transition: color 0.3s;
+        }
+
+        .nav-links a:hover {
+            color: var(--accent);
+        }
+
+        /* Header */
+        .header {
+            padding: 8rem 0 4rem;
+            background: linear-gradient(rgba(58, 38, 24, 0.7), rgba(58, 38, 24, 0.7)),
+                        url('https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80');
+            background-size: cover;
+            background-position: center;
+            color: white;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 3.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .header p {
+            font-size: 1.25rem;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        /* States Grid */
+        .states-section {
+            padding: 4rem 0;
+        }
+
+        .states-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .state-card {
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: transform 0.3s;
+            text-decoration: none;
+            color: var(--text);
+        }
+
+        .state-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .state-card h3 {
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .state-card .shop-count {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .state-card .featured-shop {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--secondary);
+            font-size: 0.9rem;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+
+            .header h1 {
+                font-size: 2.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-content container">
+            <a href="/" class="logo">Coffee Directory</a>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/pages/states">States</a>
+                <a href="/pages/about">About</a>
+                <a href="/pages/contact">Contact</a>
+            </div>
+        </div>
+    </nav>
+
+    <header class="header">
+        <div class="container">
+            <h1>US Coffee Shops by State</h1>
+            <p>Explore coffee shops across the United States. Find the perfect spot in your state or discover new favorites while traveling.</p>
+        </div>
+    </header>
+
+    <section class="states-section">
+        <div class="container">
+            <div class="states-grid">
+                <!-- Sample State Cards -->
+                <a href="/pages/states/california.html" class="state-card">
+                    <h3>California</h3>
+                    <div class="shop-count">245 Coffee Shops</div>
+                    <div class="featured-shop">
+                        Featured: Artisan Coffee House
+                    </div>
+                </a>
+
+                <a href="/pages/states/new-york.html" class="state-card">
+                    <h3>New York</h3>
+                    <div class="shop-count">189 Coffee Shops</div>
+                    <div class="featured-shop">
+                        Featured: Brooklyn Brew Co.
+                    </div>
+                </a>
+
+                <a href="/pages/states/oregon.html" class="state-card">
+                    <h3>Oregon</h3>
+                    <div class="shop-count">156 Coffee Shops</div>
+                    <div class="featured-shop">
+                        Featured: Portland Roasters
+                    </div>
+                </a>
+
+                <!-- More state cards will be added dynamically -->
+            </div>
+        </div>
+    </section>
+
+    <script>
+        // State data will be loaded dynamically
+        const states = [
+            { name: 'California', count: 245, featured: 'Artisan Coffee House' },
+            { name: 'New York', count: 189, featured: 'Brooklyn Brew Co.' },
+            { name: 'Oregon', count: 156, featured: 'Portland Roasters' },
+            // More states will be added
+        ];
+
+        // Function to generate state cards
+        function generateStateCards() {
+            const statesGrid = document.querySelector('.states-grid');
+            states.forEach(state => {
+                const card = document.createElement('a');
+                card.href = `/pages/states/${state.name.toLowerCase().replace(/\s+/g, '-')}.html`;
+                card.className = 'state-card';
+                card.innerHTML = `
+                    <h3>${state.name}</h3>
+                    <div class="shop-count">${state.count} Coffee Shops</div>
+                    <div class="featured-shop">
+                        Featured: ${state.featured}
+                    </div>
+                `;
+                statesGrid.appendChild(card);
+            });
+        }
+
+        // Generate cards when the page loads
+        document.addEventListener('DOMContentLoaded', generateStateCards);
+    </script>
+</body>
+</html> 

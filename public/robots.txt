@@ -1,0 +1,20 @@
+# Robots.txt for Local Coffee Shops
+# https://localcoffeeshop.co
+
+User-agent: *
+Allow: /
+
+# Disallow API endpoints (not useful for search indexing)
+Disallow: /api/
+Disallow: /metrics
+
+# Disallow admin and internal paths
+Disallow: /node_modules/
+Disallow: /*.json$
+Disallow: /*.log$
+
+# Sitemap location
+Sitemap: https://localcoffeeshop.co/sitemap.xml
+
+# Crawl-delay for polite crawling (optional)
+Crawl-delay: 1

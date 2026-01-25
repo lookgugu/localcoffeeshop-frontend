@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alaska Coffee Shops | localcoffeeshops.co</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2C3E50;
+            --text: #2C3E50;
+            --background: #FFFFFF;
+            --border: #E5E5E5;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Source Sans Pro', sans-serif;
+            line-height: 1.7;
+            color: var(--text);
+            background-color: var(--background);
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 0 1rem;
+        }
+
+        /* Navigation */
+        .navbar {
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 0;
+        }
+
+        .nav-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.2rem;
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 700;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: var(--text);
+            font-weight: 400;
+        }
+
+        /* Header */
+        .header {
+            padding: 3rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            color: var(--primary);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            color: #777;
+        }
+
+        /* Search Section */
+        .search-section {
+            padding: 2rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .search-container {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .search-input {
+            flex: 1;
+            padding: 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+
+        .search-button {
+            padding: 0.75rem 1.5rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 700;
+        }
+
+        .filters {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .filter-button {
+            padding: 0.5rem 1rem;
+            background: #f5f5f5;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        /* Coffee Shops Section */
+        .coffee-shops-section {
+            padding: 2rem 0;
+        }
+
+        .coffee-shop-card {
+            padding: 1.5rem 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .coffee-shop-card:last-child {
+            border-bottom: none;
+        }
+
+        .coffee-shop-card h3 {
+            font-size: 1.2rem;
+            margin-bottom: 0.5rem;
+            color: var(--primary);
+        }
+
+        .rating {
+            color: #777;
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .features {
+            display: flex;
+            gap: 1rem;
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+            color: #777;
+        }
+
+        /* Map Section */
+        .map-section {
+            margin-top: 2rem;
+            border-top: 1px solid var(--border);
+            padding-top: 2rem;
+        }
+
+        .map-container {
+            height: 300px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 778px) {
+            .nav-links {
+                display: none;
+            }
+
+            .search-container {
+                flex-direction: column;
+            }
+
+            .search-button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-content container">
+            <a href="/" class="logo">localcoffeeshops.co</a>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/pages/states">States</a>
+                <a href="/pages/about">About</a>
+                <a href="/pages/contact">Contact</a>
+            </div>
+        </div>
+    </nav>
+
+    <header class="header">
+        <div class="container">
+            <h1>Alaska Coffee Shops</h1>
+            <p>Find coffee shops across Alaska. Search by location, amenities, or browse our curated list.</p>
+        </div>
+    </header>
+
+    <section class="search-section">
+        <div class="container">
+            <div class="search-container">
+                <input type="text" class="search-input" placeholder="Search coffee shops in Alaska...">
+                <button class="search-button">Search</button>
+            </div>
+            <div class="filters">
+                <button class="filter-button">WiFi</button>
+                <button class="filter-button">Pet Friendly</button>
+                <button class="filter-button">Outdoor Seating</button>
+                <button class="filter-button">Food Menu</button>
+                <button class="filter-button">Power Outlets</button>
+            </div>
+        </div>
+    </section>
+
+    <section class="coffee-shops-section">
+        <div class="container">
+            <div class="coffee-shop-card">
+                <h3>Artisan Coffee House</h3>
+                <div class="rating">4.7 ★</div>
+                <p>Specialty coffee roaster with industrial-chic decor. Located in downtown Sacramento.</p>
+                <div class="features">
+                    <span>WiFi</span>
+                    <span>Pet Friendly</span>
+                    <span>Power Outlets</span>
+                </div>
+            </div>
+
+            <div class="coffee-shop-card">
+                <h3>Blue Bottle Coffee</h3>
+                <div class="rating">5.0 ★</div>
+                <p>Artisanal coffee roaster with minimalist design. Multiple locations throughout Alaska.</p>
+                <div class="features">
+                    <span>WiFi</span>
+                    <span>Power Outlets</span>
+                    <span>Food Menu</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="map-section">
+        <div class="container">
+            <div class="map-container" id="map"></div>
+        </div>
+    </section>
+
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script>
+        const map = L.map('map').setView([38.5557, -121.4789], 7);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+        const coffeeShops = [
+            { name: 'Artisan Coffee House', lat: 37.7749, lng: -122.4194 },
+            { name: 'Blue Bottle Coffee', lat: 34.0522, lng: -118.2437 }
+        ];
+
+        coffeeShops.forEach(shop => {
+            L.marker([shop.lat, shop.lng])
+                .addTo(map)
+                .bindPopup(shop.name);
+        });
+    </script>
+</body>
+</html> 
+</html> 

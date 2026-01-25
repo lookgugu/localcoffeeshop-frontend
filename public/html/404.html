@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex">
+    <title>Page Not Found - Local Coffee Shops</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/config.js"></script>
+    <script src="/consent-banner.js"></script>
+    <script src="/analytics.js" async></script>
+    <script src="/constants.js"></script>
+    <style>
+        .error-page {
+            min-height: 70vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .error-code {
+            font-size: 8rem;
+            font-weight: 700;
+            color: #e0e0e0;
+            line-height: 1;
+            margin-bottom: 20px;
+        }
+
+        .error-title {
+            font-size: 1.8rem;
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .error-description {
+            font-size: 1.1rem;
+            color: #666;
+            max-width: 500px;
+            margin: 0 auto 30px;
+            line-height: 1.6;
+        }
+
+        .error-actions {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .error-link {
+            display: inline-block;
+            padding: 12px 24px;
+            background-color: #4a7bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 500;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+
+        .error-link:hover {
+            background-color: #3a6be8;
+            transform: translateY(-2px);
+        }
+
+        .error-link:focus {
+            outline: 3px solid #4a7bff;
+            outline-offset: 2px;
+        }
+
+        .error-link.secondary {
+            background-color: #f1f1f1;
+            color: #333;
+        }
+
+        .error-link.secondary:hover {
+            background-color: #e1e1e1;
+        }
+
+        .error-suggestions {
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 1px solid #eee;
+            max-width: 500px;
+        }
+
+        .error-suggestions h3 {
+            font-size: 1rem;
+            color: #666;
+            margin-bottom: 15px;
+        }
+
+        .error-suggestions ul {
+            list-style: none;
+            padding: 0;
+            text-align: left;
+        }
+
+        .error-suggestions li {
+            margin-bottom: 10px;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .error-suggestions li::before {
+            content: "\2192";
+            position: absolute;
+            left: 0;
+            color: #4a7bff;
+        }
+
+        .error-suggestions a {
+            color: #4a7bff;
+            text-decoration: none;
+        }
+
+        .error-suggestions a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 768px) {
+            .error-code {
+                font-size: 5rem;
+            }
+
+            .error-title {
+                font-size: 1.4rem;
+            }
+
+            .error-actions {
+                flex-direction: column;
+                width: 100%;
+            }
+
+            .error-link {
+                width: 100%;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <div class="error-page" role="main">
+            <div class="error-code" aria-hidden="true">404</div>
+            <h1 class="error-title">Page Not Found</h1>
+            <p class="error-description">
+                Sorry, we couldn't find the page you're looking for.
+                It may have been moved, deleted, or the URL might be incorrect.
+            </p>
+
+            <div class="error-actions">
+                <a href="/" class="error-link">Go to Homepage</a>
+                <a href="javascript:history.back()" class="error-link secondary">Go Back</a>
+            </div>
+
+            <div class="error-suggestions">
+                <h3>You might be looking for:</h3>
+                <ul>
+                    <li><a href="/">Browse coffee shops by state</a></li>
+                    <li><a href="/?q=coffee">Search for coffee shops</a></li>
+                    <li><a href="/html/state.html?code=CA">California coffee shops</a></li>
+                    <li><a href="/html/state.html?code=NY">New York coffee shops</a></li>
+                </ul>
+            </div>
+        </div>
+    </main>
+</body>
+</html>
