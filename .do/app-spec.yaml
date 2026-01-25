@@ -45,9 +45,6 @@ static_sites:
     routes:
       - path: /
 
-    # Error document
-    error_document: html/404.html
-
 # Features
 features:
   - buildpack-stack=ubuntu-22
