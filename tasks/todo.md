@@ -78,32 +78,62 @@ Independent of #1 above — but worth doing #1 first so the touched files are cl
 
 After #2 (ApiClient) lands so the views' fetch concerns are already simplified. Honours ADR-0001 (this repo): explicit pub/sub, not Proxy, not atoms.
 
-- [ ] Create `public/lib/lru-map.js` — `class LruMap` with `get`, `set`, `has`, `delete`, size cap + LRU eviction (~30 LOC)
-- [ ] Create `public/store.js`:
-  - [ ] `createStore(initialState)` factory
-  - [ ] Five-method interface: `get(key)`, `set(key, value)`, `update(key, prev => next)`, `subscribe(key, fn) → unsubscribe()`, `snapshot() → readonly clone`
-  - [ ] Shallow-equality rule on `set`: no-op if shallow-equal to current
-  - [ ] `update` is the safe mutation path — receives `prev`, returns `next`, always produces a new reference for collections
-  - [ ] Synchronous notification in registration order
-  - [ ] Subscribe on unknown key throws (typo guard — initialState defines the schema)
-  - [ ] `set` on unknown key throws
-  - [ ] **No `subscribeAll`** — deliberately omitted to discourage "re-render everything" anti-pattern
-  - [ ] **No `transaction`/`batch`** — premature; add when a real ordering case appears
-- [ ] Refactor `public/frontend.js`:
-  - [ ] Construct an index-page store with schema `{ dataCache: new LruMap(MAX), loadingStates: new Set(), availableStates: [], lastSearchResults: null, loadMoreState: {shops: [], currentlyShowing: 0} }`
-  - [ ] Replace the `state` object (lines 76–99) with store accesses
-  - [ ] Replace `stateUtils.setCacheEntry / addLoadingState / cleanupLoadingStates / clearResultsElements / resetLoadMoreState` (lines 102–143) with `store.update(...)` calls
-  - [ ] Move `dom`, `resultsElements`, `gridColumns`, `resizeTimeout` OUT of state — they're rendering concerns; keep them as module-locals in the view layer
-  - [ ] Add per-key subscribers: `store.subscribe('dataCache', renderStateCards)`, `store.subscribe('loadMoreState', renderResults)`, etc.
-- [ ] Refactor `public/html/state.js`:
-  - [ ] Construct a state-detail store with schema `{ shops: [], loading: false, error: null }`
-  - [ ] Replace inline loading flags + error state with store accesses
-- [ ] Tests:
-  - [ ] State transitions without a DOM
-  - [ ] `set` with shallow-equal value does not notify
-  - [ ] `update` produces a new reference and notifies
-  - [ ] Subscribers fire in registration order
-  - [ ] Subscribe on unknown key throws
+- [x] Create `public/lib/lru-map.js` — `class LruMap` with `get`, `set`, `has`, `delete`, size cap + LRU eviction (~30 LOC) — 87 LOC actual, including JSDoc + UMD shim
+- [x] Create `public/store.js`:
+  - [x] `createStore(initialState)` factory
+  - [x] Five-method interface: `get(key)`, `set(key, value)`, `update(key, prev => next)`, `subscribe(key, fn) → unsubscribe()`, `snapshot() → readonly clone`
+  - [x] Shallow-equality rule on `set`: no-op if shallow-equal to current
+  - [x] `update` is the safe mutation path — receives `prev`, returns `next`, always produces a new reference for collections
+  - [x] Synchronous notification in registration order
+  - [x] Subscribe on unknown key throws (typo guard — initialState defines the schema)
+  - [x] `set` on unknown key throws
+  - [x] **No `subscribeAll`** — deliberately omitted to discourage "re-render everything" anti-pattern
+  - [x] **No `transaction`/`batch`** — premature; add when a real ordering case appears
+- [x] Refactor `public/frontend.js`:
+  - [x] Construct an index-page store with schema `{ dataCache: new LruMap(MAX), loadingStates: new Set(), availableStates: [], lastSearchResults: null, loadMoreState: {shops: [], currentlyShowing: 0} }`
+  - [x] Replace the `state` object (lines 76–99) with store accesses
+  - [x] Replace `stateUtils.setCacheEntry / addLoadingState / cleanupLoadingStates / clearResultsElements / resetLoadMoreState` (lines 102–143) with `store.update(...)` calls
+  - [x] Move `dom`, `resultsElements`, `gridColumns`, `resizeTimeout`, `searchTimeout` OUT of state — they're rendering concerns; kept as module-locals in the view layer
+  - [x] Added per-key subscribers: `store.subscribe('availableStates', createStateGrid)`, `store.subscribe('lastSearchResults', displayResults)`
+- [x] Refactor `public/html/state.js`:
+  - [x] Construct a state-detail store with schema `{ shops: null, loading: false, error: null }` (shops starts null so a successful empty load notifies)
+  - [x] Replace inline loading flags + error state with store accesses
+  - [x] Subscribers: `shops → renderShops`, `loading → toggleSkeletonLoading`, `error → showOrHideError`
+- [x] Asset loaders updated (`asset-loader.js` injects lru-map + store before frontend; `asset-loader-state.js` injects store before state.js)
+- [x] `package.json#build:js` minifies the new files (`store.min.js`, `lru-map.min.js`)
+- [x] Tests:
+  - [x] State transitions without a DOM (`tests/unit/store.test.js`, 28 cases)
+  - [x] `set` with shallow-equal value does not notify
+  - [x] `update` produces a new reference and notifies
+  - [x] Subscribers fire in registration order
+  - [x] Subscribe on unknown key throws
+  - [x] Map/Set values ALWAYS notify (the load-bearing contract)
+  - [x] LruMap (`tests/unit/lib/lru-map.test.js`, 17 cases): eviction, recency-bump on get, iteration order
+
+---
+
+### Section 3 — Explicit pub/sub Store (candidate #5)
+
+- **New files**: `public/store.js` (155 LOC including JSDoc / UMD shim; minified to 1.7KB) and `public/lib/lru-map.js` (87 LOC; minified to ~0.9KB).
+- **Refactor scope**:
+  - `public/frontend.js`: the original `state` object (lines 57–80) + `stateUtils` (lines 83–124) were ~70 LOC of mixed app state + rendering concerns. The new store schema is 7 lines (5 keys); rendering concerns moved to ~10 lines of module-local declarations (`searchTimeout`, `resizeTimeout`, `gridColumns`, `resultsElements`, `dom`). The mutation helpers vanish — `stateUtils.setCacheEntry` became one `store.update('dataCache', ...)` call inline at the only callsite; the rest similarly inlined. Net file size unchanged (~972 LOC; the savings were eaten by extra comments documenting the Map/Set notification rule).
+  - `public/html/state.js`: split the monolithic `loadCoffeeShops` into a thin fetcher (`loadStateShops`) that writes the store and three renderers (`renderShops`, `toggleSkeletonLoading`, `showOrHideError`) wired via subscribers. File grew from 239 → 302 LOC because the renderer functions are now named/separated rather than inlined.
+- **Subscribers wired**:
+  - Index page (`frontend.js`):
+    - `availableStates → createStateGrid`
+    - `lastSearchResults → displayResults`
+  - State-detail page (`html/state.js`):
+    - `shops → renderShops`
+    - `loading → toggleSkeletonLoading`
+    - `error → showOrHideError`
+- **Shallow-equality + Map/Set contract**: the load-bearing rule from ADR-0001. Map and Set values are checked BEFORE `Object.is` short-circuit so that the common `update('cache', m => { m.set(k, v); return m; })` pattern still notifies subscribers. Without this ordering, in-place mutation followed by handing back the same reference would silently no-op. This is covered by two dedicated test cases (`Map values ALWAYS notify…` and `Set values ALWAYS notify…`).
+- **Tests**: 45 new cases (28 store + 17 lru-map). Total before: 429 passing + 14 skipped + 1 pre-existing sw.test.js failure. Total after: **474 passing + 14 skipped + 1 pre-existing failure** (unchanged).
+- **Build**: `npm run build:js` succeeds; `dist/store.min.js` (1.7KB) and `dist/lru-map.min.js` (0.9KB) produced.
+- **What was deliberately NOT done** (per ADR-0001):
+  - No `subscribeAll` method
+  - No Proxy-based reactivity
+  - No per-atom signal system
+  - No `transaction`/`batch` API
 
 ---
 

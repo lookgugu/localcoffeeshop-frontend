@@ -8,6 +8,7 @@
         enums: isProduction ? '/dist/enums.min.js' : '/enums.js',
         skeleton: isProduction ? '/dist/skeleton.min.js' : '/skeleton.js',
         apiClient: isProduction ? '/dist/api-client.min.js' : '/api-client.js',
+        store: isProduction ? '/dist/store.min.js' : '/store.js',
         swRegistration: isProduction ? '/dist/service-worker-registration.min.js' : '/service-worker-registration.js',
         connectionBanner: isProduction ? '/dist/connection-banner.min.js' : '/connection-banner.js',
         state: isProduction ? '/dist/state.min.js' : '/html/state.js'
@@ -37,10 +38,12 @@
     bannerScript.src = assets.connectionBanner;
     document.head.appendChild(bannerScript);
 
-    // App-code deps: enums + skeleton + api-client MUST load and execute
-    // before state.js (state.js throws if any global is missing). Dynamically-
-    // inserted scripts default to async:true (no ordering guarantee), so we
-    // force async=false to preserve insertion order.
+    // App-code deps: enums + skeleton + api-client + store MUST load and
+    // execute before state.js (state.js throws if any global is missing).
+    // The state-detail page doesn't need lru-map (no LruMap usage), so we
+    // skip it here to keep page weight down. Dynamically-inserted scripts
+    // default to async:true (no ordering guarantee), so we force async=false
+    // to preserve insertion order.
     const enumsScript = document.createElement('script');
     enumsScript.src = assets.enums;
     enumsScript.async = false;
@@ -55,6 +58,11 @@
     apiClientScript.src = assets.apiClient;
     apiClientScript.async = false;
     document.head.appendChild(apiClientScript);
+
+    const storeScript = document.createElement('script');
+    storeScript.src = assets.store;
+    storeScript.async = false;
+    document.head.appendChild(storeScript);
 
     const stateScript = document.createElement('script');
     stateScript.src = assets.state;

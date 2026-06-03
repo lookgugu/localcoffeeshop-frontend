@@ -4,7 +4,7 @@
  * @module state
  */
 
-// Hard dep on enums + skeleton + api-client — fail loud if missing
+// Hard dep on enums + skeleton + api-client + store — fail loud if missing
 // (script order is enforced by asset-loader-state.js).
 if (!window.CoffeeShopEnums) {
     throw new Error('window.CoffeeShopEnums not loaded — check script order in HTML');
@@ -15,9 +15,27 @@ if (!window.CoffeeShopSkeleton) {
 if (!window.ApiClient) {
     throw new Error('window.ApiClient not loaded — check script order in HTML');
 }
+if (!window.CoffeeShopStore) {
+    throw new Error('window.CoffeeShopStore not loaded — check script order in HTML');
+}
 const { stateName, isStateCode, Price } = window.CoffeeShopEnums;
 const { createSkeletonItem } = window.CoffeeShopSkeleton;
 const api = window.ApiClient;
+const { createStore } = window.CoffeeShopStore;
+
+// Per-page store (ADR-0001): three keys cover all the state-detail view's
+// reactive surface.
+//   - shops:   the list rendered into <ul id="coffeeList"> (null = unloaded)
+//   - loading: skeleton-loading toggle
+//   - error:   user-facing error message (null when no error)
+//
+// `shops` starts as null (not []) so that a successful empty-result load
+// still notifies subscribers (null → [] is a real change; [] → [] is not).
+const store = createStore({
+    shops: null,
+    loading: false,
+    error: null
+});
 
 /**
  * Display an error message in the coffee list
@@ -130,10 +148,127 @@ async function loadBackendConfig() {
     }
 }
 
+// ============================================================================
+// RENDERERS — wired to the store via per-key subscribers below.
+// Each renderer reads only the key it subscribes to.
+// ============================================================================
+
 /**
- * Load and display coffee shops for the current state
- * Main entry point that handles validation, API fetching, and rendering
- * @returns {Promise<void>}
+ * Render the shops list + the summary stats (total + avg price).
+ * Triggered by store.subscribe('shops', renderShops). `shops` is null
+ * before the first successful load.
+ */
+function renderShops(shops) {
+    if (shops == null) return;
+
+    const coffeeList = document.getElementById('coffeeList');
+    const totalShops = document.getElementById('totalShops');
+    const avgPrice = document.getElementById('avgPrice');
+
+    coffeeList.textContent = '';
+    totalShops.textContent = shops.length;
+    avgPrice.textContent = Price.average(shops.map(s => Price.fromKey(s.priceLevel))).label;
+
+    if (shops.length === 0) {
+        // Empty-after-load is a UX concern, not an error — but the existing
+        // contract used showError() to surface it. Preserve that.
+        if (!store.get('loading') && store.get('error') === null) {
+            showError('No coffee shops found in this state.');
+        }
+        return;
+    }
+
+    // Sort shops by name (stable copy — never mutate the store value).
+    const sorted = shops.slice().sort((a, b) => {
+        const nameA = a.displayName?.text || '';
+        const nameB = b.displayName?.text || '';
+        return nameA.localeCompare(nameB);
+    });
+
+    const fragment = document.createDocumentFragment();
+    sorted.forEach(shop => {
+        const li = document.createElement('li');
+        li.className = 'coffee-item';
+
+        const h3 = document.createElement('h3');
+        h3.textContent = shop.displayName?.text || 'Unknown';
+        li.appendChild(h3);
+
+        const p = document.createElement('p');
+        p.textContent = shop.formattedAddress || '';
+        li.appendChild(p);
+
+        if (shop.priceLevel) {
+            const priceInfo = Price.fromKey(shop.priceLevel);
+            const priceLabel = priceInfo.label.toLowerCase();
+            const span = document.createElement('span');
+            span.className = 'price-level ' + priceInfo.cssClass;
+            span.textContent = priceLabel;
+            span.setAttribute('aria-label', 'Price level: ' + priceLabel);
+            li.appendChild(span);
+        }
+
+        fragment.appendChild(li);
+    });
+    coffeeList.appendChild(fragment);
+}
+
+/**
+ * Toggle skeleton loading visibility.
+ * Triggered by store.subscribe('loading', toggleSkeletonLoading).
+ */
+function toggleSkeletonLoading(isLoading) {
+    if (isLoading) {
+        showSkeletonLoading();
+    } else {
+        hideSkeletonLoading();
+    }
+}
+
+/**
+ * Show or hide the user-facing error message.
+ * Triggered by store.subscribe('error', showOrHideError).
+ */
+function showOrHideError(message) {
+    if (message) {
+        document.getElementById('totalShops').textContent = '-';
+        document.getElementById('avgPrice').textContent = '-';
+        showError(message);
+    }
+    // No "hide" action: a successful render replaces the list contents in
+    // renderShops, which clears any prior error <li>.
+}
+
+// Wire subscribers — see ADR-0001 for the rationale on explicit per-key subscriptions.
+store.subscribe('shops', renderShops);
+store.subscribe('loading', toggleSkeletonLoading);
+store.subscribe('error', showOrHideError);
+
+/**
+ * Fetch coffee shops for `stateCode`, pushing results into the store.
+ * Renderers react via subscribers.
+ */
+async function loadStateShops(stateCode) {
+    store.set('loading', true);
+    store.set('error', null);
+    try {
+        const data = await api.get(`/states/${stateCode}`);
+        const coffeeShops = Array.isArray(data) ? data : [];
+        if (!Array.isArray(coffeeShops)) {
+            throw new Error('Invalid data format received from API');
+        }
+        store.set('shops', coffeeShops);
+    } catch (err) {
+        console.error('Error loading coffee shops:', err);
+        store.set('error', 'Error loading coffee shops. Please try again later.');
+    } finally {
+        store.set('loading', false);
+    }
+}
+
+/**
+ * Page entry point: validate URL params, update title/meta, then fetch.
+ * Rendering is handled by store subscribers.
  */
 async function loadCoffeeShops() {
     const stateCode = getStateCode();
@@ -160,78 +295,7 @@ async function loadCoffeeShops() {
     // Update meta tags for SEO
     updateMetaTags(fullStateName, stateCode);
 
-    // Show skeleton loading
-    showSkeletonLoading();
-
-    try {
-        const data = await api.get(`/states/${stateCode}`);
-        const coffeeShops = Array.isArray(data) ? data : [];
-
-        // Validate that we have an array
-        if (!Array.isArray(coffeeShops)) {
-            throw new Error('Invalid data format received from API');
-        }
-
-        // Hide skeleton loading
-        hideSkeletonLoading();
-
-        const coffeeList = document.getElementById('coffeeList');
-        const totalShops = document.getElementById('totalShops');
-        const avgPrice = document.getElementById('avgPrice');
-
-        // Update total shops count
-        totalShops.textContent = coffeeShops.length;
-
-        // Update average price level via the Price typed enum
-        avgPrice.textContent = Price.average(coffeeShops.map(s => Price.fromKey(s.priceLevel))).label;
-
-        // Handle empty results
-        if (coffeeShops.length === 0) {
-            showError('No coffee shops found in this state.');
-            return;
-        }
-
-        // Sort shops by name
-        coffeeShops.sort((a, b) => {
-            const nameA = a.displayName?.text || '';
-            const nameB = b.displayName?.text || '';
-            return nameA.localeCompare(nameB);
-        });
-
-        // Display each coffee shop
-        coffeeShops.forEach(shop => {
-            const li = document.createElement('li');
-            li.className = 'coffee-item';
-
-            // Create elements safely using textContent (prevents XSS)
-            const h3 = document.createElement('h3');
-            h3.textContent = shop.displayName?.text || 'Unknown';
-            li.appendChild(h3);
-
-            const p = document.createElement('p');
-            p.textContent = shop.formattedAddress || '';
-            li.appendChild(p);
-
-            if (shop.priceLevel) {
-                const priceInfo = Price.fromKey(shop.priceLevel);
-                const priceLabel = priceInfo.label.toLowerCase();
-                const span = document.createElement('span');
-                span.className = 'price-level ' + priceInfo.cssClass;
-                span.textContent = priceLabel;
-                // Add aria-label for screen readers
-                span.setAttribute('aria-label', 'Price level: ' + priceLabel);
-                li.appendChild(span);
-            }
-
-            coffeeList.appendChild(li);
-        });
-    } catch (error) {
-        console.error('Error loading coffee shops:', error);
-        hideSkeletonLoading();
-        document.getElementById('totalShops').textContent = '-';
-        document.getElementById('avgPrice').textContent = '-';
-        showError('Error loading coffee shops. Please try again later.');
-    }
+    await loadStateShops(stateCode);
 }
 
 // Initialize the page
