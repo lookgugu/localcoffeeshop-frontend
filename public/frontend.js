@@ -7,22 +7,25 @@
     // CONSTANTS (uses shared enums from enums.js)
     // ============================================================================
 
-    // Hard dep on enums — fail loud if missing instead of silently falling back to
-    // a stale local copy (the previous bug class this refactor was designed to kill).
+    // Hard dep on enums + skeleton + api-client — fail loud if any are missing
+    // instead of silently falling back. Script-load order is enforced by the
+    // asset loader (async=false on dynamically-injected tags).
     if (!window.CoffeeShopEnums) {
         throw new Error('window.CoffeeShopEnums not loaded — check script order in HTML');
     }
     if (!window.CoffeeShopSkeleton) {
         throw new Error('window.CoffeeShopSkeleton not loaded — check script order in HTML');
     }
+    if (!window.ApiClient) {
+        throw new Error('window.ApiClient not loaded — check script order in HTML');
+    }
     const Enums = window.CoffeeShopEnums;
     const { stateName, isStateCode, Price } = Enums;
     const { createSkeletonItem } = window.CoffeeShopSkeleton;
+    const api = window.ApiClient;
+    const { ApiEnvelopeError, ApiHttpError } = api.errors;
 
     const CONSTANTS = {
-        // API Configuration
-        API_BASE_URL: window.APP_CONFIG?.API_BASE_URL || '/api/v1',
-
         // Performance Settings
         SEARCH_DEBOUNCE_MS: 300,
         IDLE_CALLBACK_TIMEOUT_MS: 5000,
@@ -37,10 +40,7 @@
         CACHE_DURATION_MS: 3600000, // 1 hour
 
         // Network Settings
-        FETCH_TIMEOUT_MS: 10000, // 10 second timeout for API requests
-        INIT_TIMEOUT_MS: 30000,  // 30 second timeout for full initialization
-        MAX_RETRIES: 3,          // Maximum number of retry attempts
-        RETRY_DELAY_MS: 1000     // Base delay between retries (exponential backoff)
+        INIT_TIMEOUT_MS: 30000   // 30 second timeout for full initialization
     };
 
     // ============================================================================
@@ -168,34 +168,8 @@
     // ============================================================================
     // API RESPONSE VALIDATION
     // ============================================================================
-
-    /**
-     * Validates and extracts data from API response
-     * @param {Object} result - The parsed JSON response
-     * @returns {Object} - { valid: boolean, data: array, error: string|null }
-     */
-    function validateApiResponse(result) {
-        // Check if result exists
-        if (!result) {
-            return { valid: false, data: [], error: 'Empty response from server' };
-        }
-
-        // Check for error response
-        if (result.success === false) {
-            const errorMsg = result.error?.message || 'Unknown server error';
-            return { valid: false, data: [], error: errorMsg };
-        }
-
-        // Extract data array (handle both wrapped and unwrapped formats)
-        const data = result.success ? result.data : result;
-
-        // Validate that data is an array
-        if (!Array.isArray(data)) {
-            return { valid: false, data: [], error: 'Invalid data format: expected array' };
-        }
-
-        return { valid: true, data, error: null };
-    }
+    // Note: envelope unwrap + retry + timeout live in ApiClient (api-client.js).
+    // These local helpers only validate the *shape* of the unwrapped data.
 
     /**
      * Validates a shop object has required properties
@@ -225,103 +199,14 @@
     // API FUNCTIONS
     // ============================================================================
 
-    /**
-     * Delay helper for retry backoff
-     * @param {number} ms - Milliseconds to delay
-     * @returns {Promise<void>}
-     */
-    function delay(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    }
-
-    /**
-     * Check if an error is retryable (network errors, timeouts, 5xx errors)
-     * @param {Error} error - The error to check
-     * @param {Response} response - Optional response object
-     * @returns {boolean}
-     */
-    function isRetryableError(error, response = null) {
-        // Network errors and timeouts are retryable
-        if (error.name === 'AbortError' || error.message.includes('timeout')) {
-            return true;
-        }
-        // Network failures (no response) are retryable
-        if (error.name === 'TypeError' && error.message.includes('fetch')) {
-            return true;
-        }
-        // 5xx server errors are retryable
-        if (response && response.status >= 500) {
-            return true;
-        }
-        // 429 Too Many Requests - retryable with backoff
-        if (response && response.status === 429) {
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * Fetch with timeout and retry support using AbortController
-     * Uses exponential backoff for retries
-     * @param {string} url - The URL to fetch
-     * @param {Object} options - Fetch options
-     * @param {number} timeout - Timeout in milliseconds (defaults to FETCH_TIMEOUT_MS)
-     * @param {number} retries - Number of retries remaining (defaults to MAX_RETRIES)
-     * @returns {Promise<Response>} - The fetch response
-     */
-    async function fetchWithTimeout(url, options = {}, timeout = CONSTANTS.FETCH_TIMEOUT_MS, retries = CONSTANTS.MAX_RETRIES) {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-        try {
-            const response = await fetch(url, {
-                ...options,
-                signal: controller.signal
-            });
-
-            // Check for server errors that should trigger retry
-            if (!response.ok && isRetryableError(null, response) && retries > 0) {
-                clearTimeout(timeoutId);
-                const retryDelay = CONSTANTS.RETRY_DELAY_MS * Math.pow(2, CONSTANTS.MAX_RETRIES - retries);
-                console.warn(`Request failed with ${response.status}, retrying in ${retryDelay}ms... (${retries} retries left)`);
-                await delay(retryDelay);
-                return fetchWithTimeout(url, options, timeout, retries - 1);
-            }
-
-            return response;
-        } catch (error) {
-            clearTimeout(timeoutId);
-
-            // Check if error is retryable and we have retries left
-            if (isRetryableError(error) && retries > 0) {
-                const retryDelay = CONSTANTS.RETRY_DELAY_MS * Math.pow(2, CONSTANTS.MAX_RETRIES - retries);
-                console.warn(`Request failed: ${error.message}, retrying in ${retryDelay}ms... (${retries} retries left)`);
-                await delay(retryDelay);
-                return fetchWithTimeout(url, options, timeout, retries - 1);
-            }
-
-            if (error.name === 'AbortError') {
-                throw new Error(`Request timeout after ${timeout}ms (after ${CONSTANTS.MAX_RETRIES - retries} retries)`);
-            }
-            throw error;
-        } finally {
-            clearTimeout(timeoutId);
-        }
-    }
-
     async function checkServerStatus() {
         try {
-            const response = await fetchWithTimeout(`${CONSTANTS.API_BASE_URL}/health`);
-            if (response.ok) {
-                const serverStatus = document.getElementById('serverStatus');
-                if (serverStatus) {
-                    serverStatus.style.display = 'none';
-                }
-                return true;
-            } else {
-                showServerError();
-                return false;
+            await api.get('/health');
+            const serverStatus = document.getElementById('serverStatus');
+            if (serverStatus) {
+                serverStatus.style.display = 'none';
             }
+            return true;
         } catch (error) {
             handleError(error, 'checkServerStatus');
             showServerError();
@@ -358,20 +243,14 @@
         stateUtils.addLoadingState(stateCode);
 
         try {
-            const response = await fetchWithTimeout(`${CONSTANTS.API_BASE_URL}/states/${stateCode}`);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const result = await response.json();
+            const data = await api.get(`/states/${stateCode}`);
 
-            // Validate API response
-            const validation = validateApiResponse(result);
-            if (!validation.valid) {
-                throw new Error(validation.error);
+            if (!Array.isArray(data)) {
+                throw new Error('Invalid data format: expected array');
             }
 
             // Filter out invalid shop entries
-            const stateShops = validation.data.filter(isValidShop);
+            const stateShops = data.filter(isValidShop);
 
             // Cache with size limit enforcement
             stateUtils.setCacheEntry(stateCode, stateShops);
@@ -395,20 +274,14 @@
 
     async function initializeStateList() {
         try {
-            const response = await fetchWithTimeout(`${CONSTANTS.API_BASE_URL}/states`);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const result = await response.json();
+            const data = await api.get('/states');
 
-            // Validate API response
-            const validation = validateApiResponse(result);
-            if (!validation.valid) {
-                throw new Error(validation.error);
+            if (!Array.isArray(data)) {
+                throw new Error('Invalid data format: expected array');
             }
 
             // Filter and process valid state data from API
-            state.availableStates = validation.data
+            state.availableStates = data
                 .filter(isValidStateInfo)
                 .map(stateInfo => ({
                     code: stateInfo.state_code,
@@ -767,26 +640,20 @@
         showLoadingState();
 
         try {
-            const params = new URLSearchParams();
-            if (searchTerm) params.append('q', searchTerm);
-            if (selectedState) params.append('state', selectedState);
-            if (selectedPrice) params.append('price', selectedPrice);
+            const data = await api.get('/search', {
+                query: {
+                    q: searchTerm,
+                    state: selectedState,
+                    price: selectedPrice,
+                },
+            });
 
-            const response = await fetchWithTimeout(`${CONSTANTS.API_BASE_URL}/search?${params.toString()}`);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const result = await response.json();
-
-            // Validate API response
-            const validation = validateApiResponse(result);
-            if (!validation.valid) {
-                throw new Error(validation.error);
+            if (!Array.isArray(data)) {
+                throw new Error('Invalid data format: expected array');
             }
 
             // Filter out invalid shop entries
-            const filteredShops = validation.data.filter(isValidShop);
+            const filteredShops = data.filter(isValidShop);
 
             hideLoadingState();
             state.lastSearchResults = filteredShops;

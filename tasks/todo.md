@@ -37,31 +37,40 @@ Coordinated with backend repo. Each repo commits its own copy of `enums.js`; a G
 
 Independent of #1 above — but worth doing #1 first so the touched files are clean.
 
-- [ ] Create `public/api-client.js`:
-  - [ ] HTTP-verb interface: `api.get(path, opts?)`, `api.post(path, body, opts?)`, `api.put(path, body, opts?)`, `api.delete(path, opts?)`
-  - [ ] Each returns `Promise<data>` — envelope unwrapped (extracts `data` from `{ success, data, error, metadata }`)
-  - [ ] Throws typed errors: `ApiUsageError` (synchronous), `ApiTimeoutError`, `ApiNetworkError`, `ApiHttpError`, `ApiEnvelopeError`
-  - [ ] Options: `{ timeout, retries, signal, headers, idempotencyKey, query }`
-  - [ ] Default `retries: 3` for GET, `retries: 0` for writes
-  - [ ] **Synchronously throw `ApiUsageError`** if `method ∈ {POST, PUT, DELETE}` AND `retries > 0` AND no `idempotencyKey` provided
-  - [ ] Resolve base URL once at module init: `window.APP_CONFIG?.API_BASE_URL ?? '/api/v1'`
-  - [ ] UMD-style footer: attaches `window.ApiClient`
-- [ ] Update `public/html/*.html` to load `<script src="/api-client.js">` before consumers
-- [ ] Refactor `public/frontend.js`:
-  - [ ] Delete `fetchWithTimeout` (lines 291–325)
-  - [ ] Replace 4 GET call sites with `api.get(...)` calls
-- [ ] Refactor `public/html/state.js`:
-  - [ ] Delete the duplicate `fetchWithTimeout` (lines 171–200)
-  - [ ] Replace 2 GET call sites with `api.get(...)` calls
-- [ ] Refactor `public/submit.js`:
-  - [ ] Delete the ad-hoc `API_BASE_URL` host-sniff (line 2)
-  - [ ] Replace 1 GET + 2 writes with `api.get(...)` / `api.post(...)` / `api.put(...)`
-  - [ ] **Generate a UUID `idempotencyKey` per form-submit attempt** and pass it to `api.post('/coffee-shops', body, { idempotencyKey })` and `api.put(...)`. This is what backend candidate #7 consumes.
-- [ ] Tests:
-  - [ ] MSW handler verifies envelope unwrap
-  - [ ] Test that retry happens N times on 5xx
-  - [ ] Test that `api.post(path, body, { retries: 3 })` without `idempotencyKey` throws synchronously
-  - [ ] Test that base URL resolves from `window.APP_CONFIG`
+- [x] Create `public/api-client.js`:
+  - [x] HTTP-verb interface: `api.get(path, opts?)`, `api.post(path, body, opts?)`, `api.put(path, body, opts?)`, `api.delete(path, opts?)`
+  - [x] Each returns `Promise<data>` — envelope unwrapped (extracts `data` from `{ success, data, error, metadata }`)
+  - [x] Throws typed errors: `ApiUsageError` (synchronous), `ApiTimeoutError`, `ApiNetworkError`, `ApiHttpError`, `ApiEnvelopeError`, `ApiParseError`
+  - [x] Options: `{ timeout, retries, signal, headers, idempotencyKey, query }`
+  - [x] Default `retries: 3` for GET, `retries: 0` for writes
+  - [x] **Synchronously throw `ApiUsageError`** if `method ∈ {POST, PUT, DELETE}` AND `retries > 0` AND no `idempotencyKey` provided. Implemented via a non-async wrapper (`_request`) that runs the safety check, then delegates to `_requestAsync` — because a `throw` inside an `async` function becomes a rejected promise, not a synchronous throw.
+  - [x] Resolve base URL once at module init: `window.APP_CONFIG?.API_BASE_URL ?? '/api/v1'` (with a `_resetBaseUrl()` escape hatch for tests)
+  - [x] UMD-style footer: attaches `window.ApiClient`
+- [x] Update `public/html/*.html` to load `<script src="/api-client.js">` before consumers (asset-loader.js, asset-loader-state.js, submit.html)
+- [x] Refactor `public/frontend.js`:
+  - [x] Delete `fetchWithTimeout`, `isRetryableError`, `delay`, `validateApiResponse` (≈155 LOC gone)
+  - [x] Replace 4 GET call sites with `api.get(...)` calls
+- [x] Refactor `public/html/state.js`:
+  - [x] Delete the duplicate `fetchWithTimeout`, `isRetryableError`, `delay`, `FETCH_TIMEOUT_MS`/`MAX_RETRIES`/`RETRY_DELAY_MS`, `API_BASE_URL` (≈110 LOC gone)
+  - [x] Replace 2 GET call sites with `api.get(...)` calls (also simplified `loadBackendConfig`)
+- [x] Refactor `public/submit.js`:
+  - [x] Delete the ad-hoc `API_BASE_URL` host-sniff (was line 1–4)
+  - [x] Replace 1 GET + 2 writes with `api.get(...)` / `api.post(...)` / `api.put(...)`
+  - [x] **Generate a UUID `idempotencyKey` per form-submit attempt** — `generateIdempotencyKey()` uses `crypto.randomUUID()` (with a Math.random v4 fallback). Called once per `handleAddSubmit` / `handleUpdateSubmit` invocation; ApiClient's internal retries reuse the same key, but a new user submission gets a new key.
+- [x] Tests (`tests/unit/api-client.test.js`, 24 cases):
+  - [x] MSW handler verifies envelope unwrap
+  - [x] Retry happens N times on 5xx; gives up after `retries`; throws `ApiHttpError` with `.status`
+  - [x] 4xx never retried (one attempt only)
+  - [x] 429 retried; network failure retried; `HttpResponse.error()` → `ApiNetworkError`
+  - [x] `api.post('/x', body, { retries: 3 })` without `idempotencyKey` throws `ApiUsageError` **synchronously** — verified with `fetchSpy` that `fetch` was NOT called
+  - [x] `api.post(... { retries: 3, idempotencyKey })` works; `Idempotency-Key` header sent
+  - [x] `api.post(... { retries: 0 })` and `api.delete(... { retries: 0 })` work without key
+  - [x] Timeout → `ApiTimeoutError`; caller-supplied AbortSignal → `ApiNetworkError`
+  - [x] 2xx + `{success: false}` → `ApiEnvelopeError`
+  - [x] Non-JSON / missing envelope → `ApiParseError`
+  - [x] Base URL resolves from `window.APP_CONFIG.API_BASE_URL`, strips trailing slash, defaults to `/api/v1`
+  - [x] Query params appended; empty/null values dropped
+  - [x] Caller headers merged over defaults; `Content-Type` set on writes
 
 ---
 
@@ -107,10 +116,20 @@ After #2 (ApiClient) lands so the views' fetch concerns are already simplified. 
 - **Fail-loud wiring**: `frontend.js`, `state.js`, `submit.js` now `throw` if `window.CoffeeShopEnums` (or `window.CoffeeShopSkeleton`) is missing. The asset-loader sets `script.async = false` on the deps so they execute in insertion order — the dynamically-inserted-script ordering gotcha is documented in a comment.
 - **Drift check**: `.github/workflows/enums-drift.yml` curls `https://raw.githubusercontent.com/lookgugu/localcoffeeshop-backend/main/src/enums.js` and `diff -q` against `public/enums.js`. Run on `push` and `pull_request`.
 
+### Section 2 — ApiClient (candidate #4)
+
+- **New file**: `public/api-client.js` (282 LOC including license-block comments; minified to 3.7KB).
+- **LOC deleted across consumers**: 345 lines removed, 115 lines added across `frontend.js`, `html/state.js`, `submit.js` (net **−230 LOC**). Two copies of `fetchWithTimeout` (one with options-argument variant in `frontend.js`, the lighter copy in `state.js`) and their `isRetryableError`/`delay`/timeout-constants posses are gone; so are `validateApiResponse` in `frontend.js`, the ad-hoc `API_BASE_URL` host-sniff in `submit.js`, and the manual `result.success` checks in the form handlers.
+- **Idempotency key strategy**: `submit.js#generateIdempotencyKey()` is called once per form-submit handler invocation (`handleAddSubmit` / `handleUpdateSubmit`). The ApiClient's *internal* retries (5xx / timeout / network) reuse the SAME key, so the backend can dedup; a user-initiated resubmit gets a NEW key by design. `crypto.randomUUID()` is preferred; a Math.random v4-shaped fallback covers legacy environments.
+- **Safety-property gotcha**: the synchronous `ApiUsageError` requirement collides with `async function` semantics — a `throw` inside an async body becomes a rejected promise. The fix is a small non-async `_request` wrapper that runs `_assertUsage()` (which is a regular function) and then calls the async `_requestAsync`. Tests verify it by spying on `globalThis.fetch` and asserting `fetch` was never called.
+- **Test coverage**: 24 new cases in `tests/unit/api-client.test.js`. Total: **405 → 429 passing** (14 skipped, 1 pre-existing sw.test.js failure unchanged).
+- **Build**: `package.json#build:js` now also minifies `api-client.js` → `dist/api-client.min.js`.
+
 ### Lessons learned (candidates for `tasks/lessons.md`)
 
 - **`"type": "module"` + UMD `.js` shim**: when a package sets `"type": "module"`, `require()` of a `.js` UMD file no longer takes the CJS branch (no `module.exports` in scope), and `import 'side-effect.js'` runs through Vite's CJS interop which captures `module.exports` but never touches `window`. Solution: `import enums from './enums.js'` (default import) gives you the same object the CJS branch produces; assign it to `window.CoffeeShopEnums` explicitly in tests that mimic browser-shaped lookups.
 - **Dynamically inserted `<script>` defaults to `async: true`**: ordering is NOT guaranteed unless you set `script.async = false`. Critical when one script attaches a global that the next script throws on if missing.
+- **`throw` inside `async function` is NOT synchronous**: it becomes a rejected promise. If a contract demands a synchronous throw (e.g. an interface-misuse guard intended to fail at code-review time), the check must live in a non-async wrapper that runs *before* the async body. Test with a `fetch` spy + `expect(() => fn()).toThrow()` (not `await expect(fn()).rejects.toThrow()`).
 
 ### Open follow-ups
 

@@ -9,6 +9,7 @@
         app: isProduction ? '/dist/app.min.js' : '/frontend.js',
         enums: isProduction ? '/dist/enums.min.js' : '/enums.js',
         skeleton: isProduction ? '/dist/skeleton.min.js' : '/skeleton.js',
+        apiClient: isProduction ? '/dist/api-client.min.js' : '/api-client.js',
         swRegistration: isProduction ? '/dist/service-worker-registration.min.js' : '/service-worker-registration.js',
         connectionBanner: isProduction ? '/dist/connection-banner.min.js' : '/connection-banner.js'
     };
@@ -37,10 +38,11 @@
     bannerScript.src = assets.connectionBanner;
     document.head.appendChild(bannerScript);
 
-    // App-code deps: enums + skeleton MUST load and execute before frontend.js
-    // (frontend.js throws if either global is missing). Dynamically-inserted scripts
-    // default to async:true (no ordering guarantee), so we force async=false to
-    // preserve insertion order — the standard pattern for ordered dynamic loads.
+    // App-code deps: enums + skeleton + api-client MUST load and execute before
+    // frontend.js (frontend.js throws if any global is missing). Dynamically-
+    // inserted scripts default to async:true (no ordering guarantee), so we
+    // force async=false to preserve insertion order — the standard pattern for
+    // ordered dynamic loads.
     const enumsScript = document.createElement('script');
     enumsScript.src = assets.enums;
     enumsScript.async = false;
@@ -50,6 +52,11 @@
     skeletonScript.src = assets.skeleton;
     skeletonScript.async = false;
     document.head.appendChild(skeletonScript);
+
+    const apiClientScript = document.createElement('script');
+    apiClientScript.src = assets.apiClient;
+    apiClientScript.async = false;
+    document.head.appendChild(apiClientScript);
 
     const appScript = document.createElement('script');
     appScript.src = assets.app;
