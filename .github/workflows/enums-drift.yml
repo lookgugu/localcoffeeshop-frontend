@@ -1,0 +1,20 @@
+name: Enums drift check
+on: [push, pull_request]
+jobs:
+  drift-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch backend enums.js
+        run: |
+          curl -sSL -o /tmp/backend-enums.js \
+            "https://raw.githubusercontent.com/lookgugu/localcoffeeshop-backend/main/src/enums.js"
+      - name: Diff against local public/enums.js
+        run: |
+          if ! diff -q public/enums.js /tmp/backend-enums.js; then
+            echo "::error::enums.js drift detected between frontend and backend repos."
+            echo "::error::Both repos must commit identical enums.js files."
+            diff public/enums.js /tmp/backend-enums.js || true
+            exit 1
+          fi
+          echo "OK enums.js matches backend repo"

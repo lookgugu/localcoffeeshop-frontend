@@ -3,28 +3,14 @@ const API_BASE_URL = window.location.origin.includes('localhost')
     ? 'http://localhost:3000/api'
     : '/api';
 
+// Hard dep on enums — fail loud if missing (script order is enforced by the HTML).
+if (!window.CoffeeShopEnums) {
+    throw new Error('window.CoffeeShopEnums not loaded — check script order in HTML');
+}
+const { stateName } = window.CoffeeShopEnums;
+
 let allCoffeeShops = [];
 let states = new Set();
-
-// Function to get state name from code
-function getStateName(stateCode) {
-    const stateNames = {
-        'AK': 'Alaska', 'AL': 'Alabama', 'AR': 'Arkansas', 'AZ': 'Arizona',
-        'CA': 'California', 'CO': 'Colorado', 'CT': 'Connecticut', 'DE': 'Delaware',
-        'FL': 'Florida', 'GA': 'Georgia', 'HI': 'Hawaii', 'IA': 'Iowa',
-        'ID': 'Idaho', 'IL': 'Illinois', 'IN': 'Indiana', 'KS': 'Kansas',
-        'KY': 'Kentucky', 'LA': 'Louisiana', 'MA': 'Massachusetts', 'MD': 'Maryland',
-        'ME': 'Maine', 'MI': 'Michigan', 'MN': 'Minnesota', 'MO': 'Missouri',
-        'MS': 'Mississippi', 'MT': 'Montana', 'NC': 'North Carolina', 'ND': 'North Dakota',
-        'NE': 'Nebraska', 'NH': 'New Hampshire', 'NJ': 'New Jersey', 'NM': 'New Mexico',
-        'NV': 'Nevada', 'NY': 'New York', 'OH': 'Ohio', 'OK': 'Oklahoma',
-        'OR': 'Oregon', 'PA': 'Pennsylvania', 'RI': 'Rhode Island', 'SC': 'South Carolina',
-        'SD': 'South Dakota', 'TN': 'Tennessee', 'TX': 'Texas', 'UT': 'Utah',
-        'VA': 'Virginia', 'VT': 'Vermont', 'WA': 'Washington', 'WI': 'Wisconsin',
-        'WV': 'West Virginia', 'WY': 'Wyoming'
-    };
-    return stateNames[stateCode] || stateCode;
-}
 
 // Function to extract state code from filename
 function getStateFromFilename(filename) {
@@ -52,7 +38,7 @@ async function loadAllCoffeeShops() {
             Array.from(states).sort().forEach(stateCode => {
                 const option = document.createElement('option');
                 option.value = stateCode;
-                option.textContent = getStateName(stateCode);
+                option.textContent = stateName(stateCode);
                 dropdown.appendChild(option);
             });
         });
@@ -231,7 +217,7 @@ async function handleAddSubmit(event) {
     });
 
     // Create formatted address
-    const formattedAddress = `${address}, ${city}, ${getStateName(state)} ${zip}`;
+    const formattedAddress = `${address}, ${city}, ${stateName(state)} ${zip}`;
 
     // Create new coffee shop object
     const newShop = {
@@ -307,7 +293,7 @@ async function handleUpdateSubmit(event) {
     });
 
     // Create formatted address
-    const formattedAddress = `${address}, ${city}, ${getStateName(state)} ${zip}`;
+    const formattedAddress = `${address}, ${city}, ${stateName(state)} ${zip}`;
 
     // Create updated coffee shop object
     const updatedShop = {

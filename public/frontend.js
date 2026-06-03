@@ -4,12 +4,20 @@
     'use strict';
 
     // ============================================================================
-    // CONSTANTS (uses shared constants from constants.js)
+    // CONSTANTS (uses shared enums from enums.js)
     // ============================================================================
 
-    // Import shared constants (loaded before this script)
-    /** @type {any} */
-    const SharedConstants = /** @type {any} */ (window).CoffeeShopConstants || {};
+    // Hard dep on enums — fail loud if missing instead of silently falling back to
+    // a stale local copy (the previous bug class this refactor was designed to kill).
+    if (!window.CoffeeShopEnums) {
+        throw new Error('window.CoffeeShopEnums not loaded — check script order in HTML');
+    }
+    if (!window.CoffeeShopSkeleton) {
+        throw new Error('window.CoffeeShopSkeleton not loaded — check script order in HTML');
+    }
+    const Enums = window.CoffeeShopEnums;
+    const { stateName, isStateCode, Price } = Enums;
+    const { createSkeletonItem } = window.CoffeeShopSkeleton;
 
     const CONSTANTS = {
         // API Configuration
@@ -32,35 +40,8 @@
         FETCH_TIMEOUT_MS: 10000, // 10 second timeout for API requests
         INIT_TIMEOUT_MS: 30000,  // 30 second timeout for full initialization
         MAX_RETRIES: 3,          // Maximum number of retry attempts
-        RETRY_DELAY_MS: 1000,    // Base delay between retries (exponential backoff)
-
-        // Use shared constants (with fallbacks for safety)
-        PRICE_LEVELS: SharedConstants.PRICE_LEVELS || {
-            'PRICE_LEVEL_INEXPENSIVE': 1,
-            'PRICE_LEVEL_MODERATE': 2,
-            'PRICE_LEVEL_EXPENSIVE': 3
-        },
-
-        STATE_NAMES: SharedConstants.STATE_NAMES || {
-            'AK': 'Alaska', 'AL': 'Alabama', 'AR': 'Arkansas', 'AZ': 'Arizona',
-            'CA': 'California', 'CO': 'Colorado', 'CT': 'Connecticut', 'DC': 'Washington D.C.',
-            'DE': 'Delaware', 'FL': 'Florida', 'GA': 'Georgia', 'HI': 'Hawaii',
-            'IA': 'Iowa', 'ID': 'Idaho', 'IL': 'Illinois', 'IN': 'Indiana',
-            'KS': 'Kansas', 'KY': 'Kentucky', 'LA': 'Louisiana', 'MA': 'Massachusetts',
-            'MD': 'Maryland', 'ME': 'Maine', 'MI': 'Michigan', 'MN': 'Minnesota',
-            'MO': 'Missouri', 'MS': 'Mississippi', 'MT': 'Montana', 'NC': 'North Carolina',
-            'ND': 'North Dakota', 'NE': 'Nebraska', 'NH': 'New Hampshire', 'NJ': 'New Jersey',
-            'NM': 'New Mexico', 'NV': 'Nevada', 'NY': 'New York', 'OH': 'Ohio',
-            'OK': 'Oklahoma', 'OR': 'Oregon', 'PA': 'Pennsylvania', 'PR': 'Puerto Rico',
-            'RI': 'Rhode Island', 'SC': 'South Carolina', 'SD': 'South Dakota', 'TN': 'Tennessee',
-            'TX': 'Texas', 'UT': 'Utah', 'VA': 'Virginia', 'VT': 'Vermont',
-            'WA': 'Washington', 'WI': 'Wisconsin', 'WV': 'West Virginia', 'WY': 'Wyoming'
-        }
+        RETRY_DELAY_MS: 1000     // Base delay between retries (exponential backoff)
     };
-
-    // Use shared utility functions from constants.js
-    // These are guaranteed to be available since constants.js loads before app.js
-    const { getStateName, getPriceLevelClass, formatPriceLevel, calculateAveragePrice, calculateAveragePriceFromLevel, createSkeletonItem } = SharedConstants;
 
     // ============================================================================
     // STATE
@@ -181,8 +162,8 @@
     // ============================================================================
     // UTILITY FUNCTIONS
     // ============================================================================
-    // Note: getStateName, getPriceLevelClass, formatPriceLevel, calculateAveragePrice,
-    // and calculateAveragePriceFromLevel are defined above using shared constants.
+    // Note: stateName, Price.fromKey/.average/.averageFromNumeric come from
+    // window.CoffeeShopEnums (loaded by enums.js before this script).
 
     // ============================================================================
     // API RESPONSE VALIDATION
@@ -440,7 +421,7 @@
             state.availableStates.forEach(stateInfo => {
                 const option = document.createElement('option');
                 option.value = stateInfo.code;
-                option.textContent = getStateName(stateInfo.code);
+                option.textContent = stateName(stateInfo.code);
                 state.dom.stateFilter.appendChild(option);
             });
 
@@ -480,16 +461,16 @@
 
             const link = document.createElement('a');
             link.href = `/html/state.html?code=${stateInfo.code}`;
-            link.setAttribute('aria-label', `${getStateName(stateInfo.code)}: ${stateInfo.shopCount} coffee shops`);
+            link.setAttribute('aria-label', `${stateName(stateInfo.code)}: ${stateInfo.shopCount} coffee shops`);
 
             const h2 = document.createElement('h2');
-            h2.textContent = getStateName(stateInfo.code);
+            h2.textContent = stateName(stateInfo.code);
 
             const p1 = document.createElement('p');
             p1.textContent = `${stateInfo.shopCount} coffee shops`;
 
             const p2 = document.createElement('p');
-            p2.textContent = `Avg. price: ${stateInfo.avgPriceLevel ? calculateAveragePriceFromLevel(stateInfo.avgPriceLevel) : 'N/A'}`;
+            p2.textContent = `Avg. price: ${Price.averageFromNumeric(stateInfo.avgPriceLevel).label}`;
 
             link.appendChild(h2);
             link.appendChild(p1);
@@ -537,13 +518,13 @@
         const stateCard = document.getElementById(`state-card-${stateCode}`);
         if (!stateCard) return;
 
-        const stateName = getStateName(stateCode);
-        const avgPrice = calculateAveragePrice(shops);
+        const fullStateName = stateName(stateCode);
+        const avgPrice = Price.average(shops.map(s => Price.fromKey(s.priceLevel))).label;
 
         const h2 = stateCard.querySelector('h2');
         const paragraphs = stateCard.querySelectorAll('p');
 
-        if (h2) h2.textContent = stateName;
+        if (h2) h2.textContent = fullStateName;
         if (paragraphs[0]) paragraphs[0].textContent = `${shops.length} coffee shops`;
         if (paragraphs[1]) paragraphs[1].textContent = `Avg. price: ${avgPrice}`;
     }
@@ -564,15 +545,17 @@
 
         const stateTag = document.createElement('p');
         stateTag.className = 'state-tag';
-        stateTag.textContent = getStateName(shop.state);
+        stateTag.textContent = stateName(shop.state);
         item.appendChild(stateTag);
 
         if (shop.priceLevel) {
+            const priceInfo = Price.fromKey(shop.priceLevel);
+            const priceLabel = priceInfo.label.toLowerCase();
             const price = document.createElement('span');
-            price.className = `price-level ${getPriceLevelClass(shop.priceLevel)}`;
-            price.textContent = formatPriceLevel(shop.priceLevel);
+            price.className = `price-level ${priceInfo.cssClass}`;
+            price.textContent = priceLabel;
             // Add aria-label for screen readers since visual styling conveys meaning
-            price.setAttribute('aria-label', `Price level: ${formatPriceLevel(shop.priceLevel)}`);
+            price.setAttribute('aria-label', `Price level: ${priceLabel}`);
             item.appendChild(price);
         }
 
@@ -688,7 +671,7 @@
         return card;
     }
 
-    // Note: createSkeletonItem is imported from SharedConstants (constants.js)
+    // Note: createSkeletonItem is imported from window.CoffeeShopSkeleton (skeleton.js)
 
     function showLoadingState() {
         if (!state.dom.searchResultsContainer) return;

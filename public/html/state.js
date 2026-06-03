@@ -4,8 +4,15 @@
  * @module state
  */
 
-// Use shared constants and utilities
-const { STATE_NAMES, getPriceLevelClass, formatPriceLevel, calculateAveragePrice, isValidStateCode, createSkeletonItem } = CoffeeShopConstants;
+// Hard dep on enums + skeleton — fail loud if missing (script order is enforced by the HTML).
+if (!window.CoffeeShopEnums) {
+    throw new Error('window.CoffeeShopEnums not loaded — check script order in HTML');
+}
+if (!window.CoffeeShopSkeleton) {
+    throw new Error('window.CoffeeShopSkeleton not loaded — check script order in HTML');
+}
+const { stateName, isStateCode, Price } = window.CoffeeShopEnums;
+const { createSkeletonItem } = window.CoffeeShopSkeleton;
 
 /**
  * Display an error message in the coffee list
@@ -20,7 +27,7 @@ function showError(message) {
     coffeeList.appendChild(li);
 }
 
-// Note: createSkeletonItem is imported from CoffeeShopConstants (constants.js)
+// Note: createSkeletonItem is imported from window.CoffeeShopSkeleton (skeleton.js)
 
 /**
  * Show skeleton loading state with accessible loading announcement
@@ -214,7 +221,7 @@ async function loadCoffeeShops() {
     const stateCode = getStateCode();
 
     // Validate state code using shared function
-    if (!isValidStateCode(stateCode)) {
+    if (!isStateCode(stateCode)) {
         document.getElementById('pageTitle').textContent = 'Invalid State';
         document.getElementById('totalShops').textContent = '-';
         document.getElementById('avgPrice').textContent = '-';
@@ -223,17 +230,17 @@ async function loadCoffeeShops() {
         return;
     }
 
-    const stateName = STATE_NAMES[stateCode];
+    const fullStateName = stateName(stateCode);
 
     // Update page title and heading
-    document.title = `Coffee Shops in ${stateName} | Local Coffee Shops`;
-    document.getElementById('pageTitle').textContent = `Coffee Shops in ${stateName}`;
+    document.title = `Coffee Shops in ${fullStateName} | Local Coffee Shops`;
+    document.getElementById('pageTitle').textContent = `Coffee Shops in ${fullStateName}`;
 
     // Load backend config to get canonical frontend URL
     await loadBackendConfig();
 
     // Update meta tags for SEO
-    updateMetaTags(stateName, stateCode);
+    updateMetaTags(fullStateName, stateCode);
 
     // Show skeleton loading
     showSkeletonLoading();
@@ -270,8 +277,8 @@ async function loadCoffeeShops() {
         // Update total shops count
         totalShops.textContent = coffeeShops.length;
 
-        // Update average price level using shared function
-        avgPrice.textContent = calculateAveragePrice(coffeeShops);
+        // Update average price level via the Price typed enum
+        avgPrice.textContent = Price.average(coffeeShops.map(s => Price.fromKey(s.priceLevel))).label;
 
         // Handle empty results
         if (coffeeShops.length === 0) {
@@ -301,12 +308,13 @@ async function loadCoffeeShops() {
             li.appendChild(p);
 
             if (shop.priceLevel) {
+                const priceInfo = Price.fromKey(shop.priceLevel);
+                const priceLabel = priceInfo.label.toLowerCase();
                 const span = document.createElement('span');
-                // Use shared functions for price level
-                span.className = 'price-level ' + getPriceLevelClass(shop.priceLevel);
-                span.textContent = formatPriceLevel(shop.priceLevel);
+                span.className = 'price-level ' + priceInfo.cssClass;
+                span.textContent = priceLabel;
                 // Add aria-label for screen readers
-                span.setAttribute('aria-label', 'Price level: ' + formatPriceLevel(shop.priceLevel));
+                span.setAttribute('aria-label', 'Price level: ' + priceLabel);
                 li.appendChild(span);
             }
 

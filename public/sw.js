@@ -14,7 +14,10 @@ const STATIC_ASSETS = [
     '/asset-loader-state.js',
     '/dist/styles.min.css',
     '/dist/app.min.js',
-    '/dist/constants.min.js',
+    '/dist/enums.min.js',
+    '/dist/skeleton.min.js',
+    '/dist/service-worker-registration.min.js',
+    '/dist/connection-banner.min.js',
     '/dist/state.min.js',
     '/analytics.js',
     '/consent-banner.js'

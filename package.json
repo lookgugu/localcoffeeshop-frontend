@@ -3,19 +3,26 @@
   "version": "1.0.0",
   "description": "Frontend for Local Coffee Shop directory",
   "main": "public/frontend.js",
+  "type": "module",
   "scripts": {
     "dev": "npm run build:config && http-server public -p 8080 -c-1",
     "build": "npm run build:config && npm run build:js && npm run build:css",
     "build:config": "node scripts/inject-config.js",
-    "build:js": "mkdir -p public/dist && npx terser public/frontend.js -o public/dist/app.min.js -c -m && npx terser public/constants.js -o public/dist/constants.min.js -c -m && npx terser public/html/state.js -o public/dist/state.min.js -c -m",
+    "build:js": "mkdir -p public/dist && npx terser public/frontend.js -o public/dist/app.min.js -c -m && npx terser public/enums.js -o public/dist/enums.min.js -c -m && npx terser public/skeleton.js -o public/dist/skeleton.min.js -c -m && npx terser public/service-worker-registration.js -o public/dist/service-worker-registration.min.js -c -m && npx terser public/connection-banner.js -o public/dist/connection-banner.min.js -c -m && npx terser public/html/state.js -o public/dist/state.min.js -c -m",
     "build:css": "npx clean-css-cli -o public/dist/styles.min.css styles.css public/styles/about.css public/styles/common.css public/styles/features.css public/styles/home.css public/styles/states.css",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "vitest",
+    "test:coverage": "vitest --coverage",
+    "test:ui": "vitest --ui",
+    "test:watch": "vitest --watch"
   },
-  "dependencies": {},
   "devDependencies": {
+    "@vitest/coverage-v8": "^4.0.18",
     "clean-css-cli": "^5.6.3",
+    "happy-dom": "^20.3.9",
     "http-server": "^14.1.1",
-    "terser": "^5.31.0"
+    "msw": "^2.12.7",
+    "terser": "^5.31.0",
+    "vitest": "^4.0.18"
   },
   "keywords": [
     "coffee",
