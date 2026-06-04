@@ -253,11 +253,10 @@ async function loadStateShops(stateCode) {
     store.set('error', null);
     try {
         const data = await api.get(`/states/${stateCode}`);
-        const coffeeShops = Array.isArray(data) ? data : [];
-        if (!Array.isArray(coffeeShops)) {
+        if (!Array.isArray(data)) {
             throw new Error('Invalid data format received from API');
         }
-        store.set('shops', coffeeShops);
+        store.set('shops', data);
     } catch (err) {
         console.error('Error loading coffee shops:', err);
         store.set('error', 'Error loading coffee shops. Please try again later.');

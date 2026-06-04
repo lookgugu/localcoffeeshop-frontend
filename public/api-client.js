@@ -11,6 +11,7 @@
  *       ApiUsageError      synchronous — misuse of the interface
  *       ApiTimeoutError    AbortController fired on our per-attempt timeout
  *       ApiNetworkError    fetch threw (offline, DNS, CORS)
+ *       ApiAbortedError    caller-supplied opts.signal aborted — never retried
  *       ApiHttpError       non-2xx after retries are exhausted
  *       ApiEnvelopeError   2xx but `{success: false}` payload
  *       ApiParseError      body wasn't JSON / wrong envelope shape
@@ -53,6 +54,9 @@
   }
   class ApiNetworkError extends ApiError {
     constructor(message, props) { super(message, props); this.name = 'ApiNetworkError'; }
+  }
+  class ApiAbortedError extends ApiError {
+    constructor(message, props) { super(message, props); this.name = 'ApiAbortedError'; }
   }
   class ApiHttpError extends ApiError {
     constructor(message, props) { super(message, props); this.name = 'ApiHttpError'; }
@@ -136,9 +140,10 @@
       return response;
     } catch (err) {
       if (err && err.name === 'AbortError') {
-        // Caller-initiated aborts should surface as their own error class
+        // Caller-initiated aborts surface as their own non-retryable error class
+        // so callers can distinguish user cancellations from real network failures.
         if (callerSignal && callerSignal.aborted) {
-          throw new ApiNetworkError(`Request to ${url} aborted by caller`, { url, cause: err });
+          throw new ApiAbortedError(`Request to ${url} aborted by caller`, { url, cause: err });
         }
         throw new ApiTimeoutError(`Request to ${url} timed out after ${timeout}ms`, { url, timeout });
       }
@@ -222,6 +227,11 @@
           url, fetchOpts, timeout, callerSignal: opts.signal,
         });
       } catch (err) {
+        // Caller-initiated aborts are NEVER retryable — surface immediately.
+        if (err instanceof ApiAbortedError) throw err;
+        // Defensive: if the caller's signal aborted between the throw and
+        // here, treat it as a caller abort regardless of the wrapped class.
+        if (opts.signal && opts.signal.aborted) throw err;
         // Network errors and timeouts are retryable.
         if (err instanceof ApiNetworkError || err instanceof ApiTimeoutError) {
           lastErr = err;
@@ -235,6 +245,8 @@
       }
 
       if (response.ok) {
+        // 204 No Content — body is empty by spec; envelope parse would throw.
+        if (response.status === 204) return null;
         // 2xx — parse envelope; an envelope error is NOT retryable.
         return await _parseEnvelope(response, url);
       }
@@ -273,6 +285,7 @@
       ApiUsageError,
       ApiTimeoutError,
       ApiNetworkError,
+      ApiAbortedError,
       ApiHttpError,
       ApiEnvelopeError,
       ApiParseError,

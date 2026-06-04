@@ -43,11 +43,14 @@ async function loadAllCoffeeShops() {
         const statesData = await api.get('/states');
 
         // Extract state codes (handle both shape `state_code` (new API) and
-        // `state` (legacy)).
-        (statesData || []).forEach(entry => {
-            const code = entry?.state_code || entry?.state;
-            if (code) states.add(code);
-        });
+        // `state` (legacy)). Guard against non-array responses — a truthy
+        // non-array (e.g. `{}`) would crash on `.forEach`.
+        if (Array.isArray(statesData)) {
+            statesData.forEach(entry => {
+                const code = entry?.state_code || entry?.state;
+                if (code) states.add(code);
+            });
+        }
 
         // Populate state dropdowns
         const stateDropdowns = document.querySelectorAll('#shop-state, #update-state');

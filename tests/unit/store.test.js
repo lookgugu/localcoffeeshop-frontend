@@ -152,6 +152,52 @@ describe('createStore — set / shallow-equality', () => {
     expect(store.set('a', { 0: 1, 1: 2 })).toBe(true);
     expect(spy).toHaveBeenCalledOnce();
   });
+
+  // Non-plain object instances (Date, RegExp, Error, class instances) have
+  // zero enumerable own keys. A naive key-count compare would falsely treat
+  // them as shallow-equal and silently no-op. They must always notify when
+  // the reference changes.
+  it('Date instances with different values trigger notification', () => {
+    const store = createStore({ a: new Date(1000) });
+    const spy = vi.fn();
+    store.subscribe('a', spy);
+    expect(store.set('a', new Date(2000))).toBe(true);
+    expect(spy).toHaveBeenCalledOnce();
+  });
+
+  it('RegExp instances trigger notification when reference changes', () => {
+    const store = createStore({ a: /foo/ });
+    const spy = vi.fn();
+    store.subscribe('a', spy);
+    expect(store.set('a', /bar/)).toBe(true);
+    expect(spy).toHaveBeenCalledOnce();
+  });
+
+  it('Error instances trigger notification when reference changes', () => {
+    const store = createStore({ a: new Error('one') });
+    const spy = vi.fn();
+    store.subscribe('a', spy);
+    expect(store.set('a', new Error('two'))).toBe(true);
+    expect(spy).toHaveBeenCalledOnce();
+  });
+
+  it('class instances with no own keys trigger notification when reference changes', () => {
+    class Foo {}
+    const store = createStore({ a: new Foo() });
+    const spy = vi.fn();
+    store.subscribe('a', spy);
+    expect(store.set('a', new Foo())).toBe(true);
+    expect(spy).toHaveBeenCalledOnce();
+  });
+
+  it('same Date reference is still shallow-equal (Object.is short-circuit)', () => {
+    const d = new Date(1000);
+    const store = createStore({ a: d });
+    const spy = vi.fn();
+    store.subscribe('a', spy);
+    expect(store.set('a', d)).toBe(false);
+    expect(spy).not.toHaveBeenCalled();
+  });
 });
 
 describe('createStore — update', () => {

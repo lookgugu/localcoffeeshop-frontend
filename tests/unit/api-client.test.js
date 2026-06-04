@@ -24,6 +24,7 @@ const {
   ApiUsageError,
   ApiTimeoutError,
   ApiNetworkError,
+  ApiAbortedError,
   ApiHttpError,
   ApiEnvelopeError,
   ApiParseError,
@@ -263,7 +264,7 @@ describe('ApiClient — timeout and abort', () => {
       .rejects.toThrow(ApiTimeoutError);
   });
 
-  it('aborts when caller-supplied AbortSignal fires', async () => {
+  it('aborts when caller-supplied AbortSignal fires and surfaces ApiAbortedError', async () => {
     server.use(
       http.get('*/api/v1/long', async () => {
         await delay(500);
@@ -275,7 +276,58 @@ describe('ApiClient — timeout and abort', () => {
     const promise = api.get('/long', { signal: controller.signal, retries: 0 });
     setTimeout(() => controller.abort(), 20);
 
-    await expect(promise).rejects.toThrow(ApiNetworkError);
+    await expect(promise).rejects.toThrow(ApiAbortedError);
+  });
+
+  it('does NOT retry after caller abort, even when retries are configured', async () => {
+    let attempts = 0;
+    server.use(
+      http.get('*/api/v1/abort-no-retry', async () => {
+        attempts++;
+        await delay(500);
+        return HttpResponse.json({ success: true, data: 'late' });
+      })
+    );
+
+    const controller = new AbortController();
+    const promise = api.get('/abort-no-retry', { signal: controller.signal, retries: 5 });
+    setTimeout(() => controller.abort(), 20);
+
+    await expect(promise).rejects.toThrow(ApiAbortedError);
+    // Tiny grace window for any (incorrect) retry attempt to fire.
+    await new Promise(r => setTimeout(r, 100));
+    expect(attempts).toBe(1);
+  });
+
+  it('distinguishes ApiAbortedError from ApiNetworkError (caller abort vs offline)', async () => {
+    // Network failure path — still surfaces as ApiNetworkError.
+    server.use(http.get('*/api/v1/net-down', () => HttpResponse.error()));
+    await expect(api.get('/net-down', { retries: 0 })).rejects.toThrow(ApiNetworkError);
+
+    // Caller-initiated abort — distinct ApiAbortedError.
+    server.use(
+      http.get('*/api/v1/cancelled', async () => {
+        await delay(500);
+        return HttpResponse.json({ success: true, data: 'late' });
+      })
+    );
+    const controller = new AbortController();
+    const promise = api.get('/cancelled', { signal: controller.signal, retries: 0 });
+    setTimeout(() => controller.abort(), 20);
+    await expect(promise).rejects.toThrow(ApiAbortedError);
+  });
+});
+
+describe('ApiClient — 204 No Content', () => {
+  it('returns null on 204 instead of failing envelope parse', async () => {
+    server.use(
+      http.delete('*/api/v1/thing/204', () => {
+        return new HttpResponse(null, { status: 204 });
+      })
+    );
+
+    const result = await api.delete('/thing/204');
+    expect(result).toBeNull();
   });
 });
 

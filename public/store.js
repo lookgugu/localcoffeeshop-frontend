@@ -10,6 +10,10 @@
  *   - Primitives & refs are compared via Object.is.
  *   - Arrays are compared element-wise (Object.is per index, lengths equal).
  *   - Plain objects are compared by shallow keys (Object.is per value).
+ *   - Non-plain object instances (Date, RegExp, Error, class instances)
+ *     ALWAYS fail equality unless they are the same reference. This avoids
+ *     silently no-op'ing on `new Date(1) -> new Date(2)` (both have zero
+ *     enumerable own keys, so a key-count compare would falsely match).
  *   - Map / Set instances ALWAYS fail equality (force "replace with new
  *     reference" discipline; in-place mutation followed by set(sameRef)
  *     still notifies because the equality check short-circuits to false).
@@ -63,7 +67,16 @@
       return true;
     }
 
-    // Plain objects — shallow key comparison.
+    // Plain objects only — shallow key comparison.
+    // Non-plain instances (Date, RegExp, Error, custom classes) with no
+    // enumerable own keys would otherwise compare equal by key-length,
+    // silently masking changes like `new Date(1) -> new Date(2)`.
+    const protoA = Object.getPrototypeOf(a);
+    const protoB = Object.getPrototypeOf(b);
+    const aIsPlain = protoA === Object.prototype || protoA === null;
+    const bIsPlain = protoB === Object.prototype || protoB === null;
+    if (!aIsPlain || !bIsPlain) return false;
+
     const aKeys = Object.keys(a);
     const bKeys = Object.keys(b);
     if (aKeys.length !== bKeys.length) return false;
