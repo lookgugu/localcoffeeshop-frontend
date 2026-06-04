@@ -1,11 +1,16 @@
 // Service Worker for Local Coffee Shop
 // Provides offline caching and improved performance
 
-const CACHE_NAME = 'coffee-shop-v3';
-const STATIC_CACHE = 'coffee-shop-static-v3';
-const API_CACHE = 'coffee-shop-api-v3';
+// Bump cache version when STATIC_ASSETS changes so existing clients
+// re-precache the new dependency list on activate.
+const CACHE_NAME = 'coffee-shop-v4';
+const STATIC_CACHE = 'coffee-shop-static-v4';
+const API_CACHE = 'coffee-shop-api-v4';
 
-// Static assets to cache on install
+// Static assets to cache on install.
+// IMPORTANT: keep this in sync with the asset loaders — every dist bundle
+// required by asset-loader[-state].js before the page becomes interactive
+// must be listed here, or first-offline-visit will fail the hard-dep checks.
 const STATIC_ASSETS = [
     '/',
     '/html/index.html',
@@ -14,8 +19,14 @@ const STATIC_ASSETS = [
     '/asset-loader-state.js',
     '/dist/styles.min.css',
     '/dist/app.min.js',
-    '/dist/constants.min.js',
+    '/dist/enums.min.js',
+    '/dist/skeleton.min.js',
+    '/dist/service-worker-registration.min.js',
+    '/dist/connection-banner.min.js',
     '/dist/state.min.js',
+    '/dist/api-client.min.js',
+    '/dist/lru-map.min.js',
+    '/dist/store.min.js',
     '/analytics.js',
     '/consent-banner.js'
 ];

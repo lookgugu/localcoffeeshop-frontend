@@ -4,17 +4,36 @@
     'use strict';
 
     // ============================================================================
-    // CONSTANTS (uses shared constants from constants.js)
+    // CONSTANTS (uses shared enums from enums.js)
     // ============================================================================
 
-    // Import shared constants (loaded before this script)
-    /** @type {any} */
-    const SharedConstants = /** @type {any} */ (window).CoffeeShopConstants || {};
+    // Hard dep on enums + skeleton + api-client + store + lru-map — fail loud
+    // if any are missing instead of silently falling back. Script-load order
+    // is enforced by the asset loader (async=false on dynamically-injected tags).
+    if (!window.CoffeeShopEnums) {
+        throw new Error('window.CoffeeShopEnums not loaded — check script order in HTML');
+    }
+    if (!window.CoffeeShopSkeleton) {
+        throw new Error('window.CoffeeShopSkeleton not loaded — check script order in HTML');
+    }
+    if (!window.ApiClient) {
+        throw new Error('window.ApiClient not loaded — check script order in HTML');
+    }
+    if (!window.CoffeeShopStore) {
+        throw new Error('window.CoffeeShopStore not loaded — check script order in HTML');
+    }
+    if (!window.CoffeeShopLruMap) {
+        throw new Error('window.CoffeeShopLruMap not loaded — check script order in HTML');
+    }
+    const Enums = window.CoffeeShopEnums;
+    const { stateName, isStateCode, Price } = Enums;
+    const { createSkeletonItem } = window.CoffeeShopSkeleton;
+    const api = window.ApiClient;
+    const { ApiEnvelopeError, ApiHttpError } = api.errors;
+    const { createStore } = window.CoffeeShopStore;
+    const { LruMap } = window.CoffeeShopLruMap;
 
     const CONSTANTS = {
-        // API Configuration
-        API_BASE_URL: window.APP_CONFIG?.API_BASE_URL || '/api/v1',
-
         // Performance Settings
         SEARCH_DEBOUNCE_MS: 300,
         IDLE_CALLBACK_TIMEOUT_MS: 5000,
@@ -29,41 +48,11 @@
         CACHE_DURATION_MS: 3600000, // 1 hour
 
         // Network Settings
-        FETCH_TIMEOUT_MS: 10000, // 10 second timeout for API requests
-        INIT_TIMEOUT_MS: 30000,  // 30 second timeout for full initialization
-        MAX_RETRIES: 3,          // Maximum number of retry attempts
-        RETRY_DELAY_MS: 1000,    // Base delay between retries (exponential backoff)
-
-        // Use shared constants (with fallbacks for safety)
-        PRICE_LEVELS: SharedConstants.PRICE_LEVELS || {
-            'PRICE_LEVEL_INEXPENSIVE': 1,
-            'PRICE_LEVEL_MODERATE': 2,
-            'PRICE_LEVEL_EXPENSIVE': 3
-        },
-
-        STATE_NAMES: SharedConstants.STATE_NAMES || {
-            'AK': 'Alaska', 'AL': 'Alabama', 'AR': 'Arkansas', 'AZ': 'Arizona',
-            'CA': 'California', 'CO': 'Colorado', 'CT': 'Connecticut', 'DC': 'Washington D.C.',
-            'DE': 'Delaware', 'FL': 'Florida', 'GA': 'Georgia', 'HI': 'Hawaii',
-            'IA': 'Iowa', 'ID': 'Idaho', 'IL': 'Illinois', 'IN': 'Indiana',
-            'KS': 'Kansas', 'KY': 'Kentucky', 'LA': 'Louisiana', 'MA': 'Massachusetts',
-            'MD': 'Maryland', 'ME': 'Maine', 'MI': 'Michigan', 'MN': 'Minnesota',
-            'MO': 'Missouri', 'MS': 'Mississippi', 'MT': 'Montana', 'NC': 'North Carolina',
-            'ND': 'North Dakota', 'NE': 'Nebraska', 'NH': 'New Hampshire', 'NJ': 'New Jersey',
-            'NM': 'New Mexico', 'NV': 'Nevada', 'NY': 'New York', 'OH': 'Ohio',
-            'OK': 'Oklahoma', 'OR': 'Oregon', 'PA': 'Pennsylvania', 'PR': 'Puerto Rico',
-            'RI': 'Rhode Island', 'SC': 'South Carolina', 'SD': 'South Dakota', 'TN': 'Tennessee',
-            'TX': 'Texas', 'UT': 'Utah', 'VA': 'Virginia', 'VT': 'Vermont',
-            'WA': 'Washington', 'WI': 'Wisconsin', 'WV': 'West Virginia', 'WY': 'Wyoming'
-        }
+        INIT_TIMEOUT_MS: 30000   // 30 second timeout for full initialization
     };
 
-    // Use shared utility functions from constants.js
-    // These are guaranteed to be available since constants.js loads before app.js
-    const { getStateName, getPriceLevelClass, formatPriceLevel, calculateAveragePrice, calculateAveragePriceFromLevel, createSkeletonItem } = SharedConstants;
-
     // ============================================================================
-    // STATE
+    // STATE — explicit pub/sub Store (ADR-0001)
     // ============================================================================
 
     // State management limits to prevent memory issues
@@ -73,73 +62,36 @@
         MAX_RESULTS_ELEMENTS: 1000  // Max DOM elements to track
     };
 
-    const state = {
-        dataCache: new Map(),
-        loadingStates: new Set(), // Track in-progress state data requests
+    // The store owns what the rest of the app reacts to. Renderers
+    // subscribe per-key; mutations go through store.update / store.set.
+    //   - dataCache: per-state shop data (LruMap caps memory automatically)
+    //   - loadingStates: which state-detail requests are in flight
+    //   - availableStates: index of state codes/counts shown on the grid
+    //   - lastSearchResults: most recent search result list (for re-renders)
+    //   - loadMoreState: pagination cursor for the search-results list
+    const store = createStore({
+        dataCache: new LruMap(STATE_LIMITS.MAX_CACHE_SIZE),
+        loadingStates: new Set(),
         availableStates: [],
-        searchTimeout: null,
         lastSearchResults: null,
-        resultsElements: [],
-        // Load more pagination state
-        loadMoreState: {
-            shops: [],
-            currentlyShowing: 0
-        },
-        // DOM element cache
-        dom: {
-            searchResultsContainer: null,
-            stateGrid: null,
-            searchInput: null,
-            stateFilter: null,
-            priceFilter: null
-        },
-        // Cached layout values for performance
-        gridColumns: null,
-        resizeTimeout: null
-    };
+        loadMoreState: { shops: [], currentlyShowing: 0 }
+    });
 
-    // State management utilities
-    const stateUtils = {
-        // Add to cache with size limit enforcement
-        setCacheEntry(key, value) {
-            // Evict oldest entry if at limit
-            if (state.dataCache.size >= STATE_LIMITS.MAX_CACHE_SIZE && !state.dataCache.has(key)) {
-                const firstKey = state.dataCache.keys().next().value;
-                state.dataCache.delete(firstKey);
-            }
-            state.dataCache.set(key, value);
-        },
-
-        // Add to loading states with limit check
-        addLoadingState(stateCode) {
-            if (state.loadingStates.size >= STATE_LIMITS.MAX_LOADING_STATES) {
-                // Clear oldest loading states if stuck
-                console.warn('Too many loading states, clearing oldest');
-                const firstState = state.loadingStates.values().next().value;
-                state.loadingStates.delete(firstState);
-            }
-            state.loadingStates.add(stateCode);
-        },
-
-        // Clean up stale loading states (older than 30 seconds)
-        cleanupLoadingStates() {
-            // Simple cleanup - just clear all if called
-            // In a more complex app, we'd track timestamps
-            if (state.loadingStates.size > 5) {
-                state.loadingStates.clear();
-            }
-        },
-
-        // Clear results elements to prevent memory leaks
-        clearResultsElements() {
-            state.resultsElements = [];
-        },
-
-        // Reset load more pagination state
-        resetLoadMoreState() {
-            state.loadMoreState.shops = [];
-            state.loadMoreState.currentlyShowing = 0;
-        }
+    // Rendering concerns — local to the view layer, NOT in the store.
+    // The original `state` object conflated these with real app state;
+    // they are debounce timers, layout memos, and DOM-ref caches that no
+    // subscriber ever needs to react to.
+    let searchTimeout = null;   // debounce timer for the search input
+    let resizeTimeout = null;   // debounce timer for window resize
+    let gridColumns = null;     // cached column count for keyboard nav
+    const resultsElements = []; // DOM nodes accumulated during render
+    const dom = {               // cached element references
+        searchResultsContainer: null,
+        stateGrid: null,
+        searchInput: null,
+        stateFilter: null,
+        priceFilter: null,
+        findNearMe: null
     };
 
     // ============================================================================
@@ -181,40 +133,14 @@
     // ============================================================================
     // UTILITY FUNCTIONS
     // ============================================================================
-    // Note: getStateName, getPriceLevelClass, formatPriceLevel, calculateAveragePrice,
-    // and calculateAveragePriceFromLevel are defined above using shared constants.
+    // Note: stateName, Price.fromKey/.average/.averageFromNumeric come from
+    // window.CoffeeShopEnums (loaded by enums.js before this script).
 
     // ============================================================================
     // API RESPONSE VALIDATION
     // ============================================================================
-
-    /**
-     * Validates and extracts data from API response
-     * @param {Object} result - The parsed JSON response
-     * @returns {Object} - { valid: boolean, data: array, error: string|null }
-     */
-    function validateApiResponse(result) {
-        // Check if result exists
-        if (!result) {
-            return { valid: false, data: [], error: 'Empty response from server' };
-        }
-
-        // Check for error response
-        if (result.success === false) {
-            const errorMsg = result.error?.message || 'Unknown server error';
-            return { valid: false, data: [], error: errorMsg };
-        }
-
-        // Extract data array (handle both wrapped and unwrapped formats)
-        const data = result.success ? result.data : result;
-
-        // Validate that data is an array
-        if (!Array.isArray(data)) {
-            return { valid: false, data: [], error: 'Invalid data format: expected array' };
-        }
-
-        return { valid: true, data, error: null };
-    }
+    // Note: envelope unwrap + retry + timeout live in ApiClient (api-client.js).
+    // These local helpers only validate the *shape* of the unwrapped data.
 
     /**
      * Validates a shop object has required properties
@@ -244,103 +170,14 @@
     // API FUNCTIONS
     // ============================================================================
 
-    /**
-     * Delay helper for retry backoff
-     * @param {number} ms - Milliseconds to delay
-     * @returns {Promise<void>}
-     */
-    function delay(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    }
-
-    /**
-     * Check if an error is retryable (network errors, timeouts, 5xx errors)
-     * @param {Error} error - The error to check
-     * @param {Response} response - Optional response object
-     * @returns {boolean}
-     */
-    function isRetryableError(error, response = null) {
-        // Network errors and timeouts are retryable
-        if (error.name === 'AbortError' || error.message.includes('timeout')) {
-            return true;
-        }
-        // Network failures (no response) are retryable
-        if (error.name === 'TypeError' && error.message.includes('fetch')) {
-            return true;
-        }
-        // 5xx server errors are retryable
-        if (response && response.status >= 500) {
-            return true;
-        }
-        // 429 Too Many Requests - retryable with backoff
-        if (response && response.status === 429) {
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * Fetch with timeout and retry support using AbortController
-     * Uses exponential backoff for retries
-     * @param {string} url - The URL to fetch
-     * @param {Object} options - Fetch options
-     * @param {number} timeout - Timeout in milliseconds (defaults to FETCH_TIMEOUT_MS)
-     * @param {number} retries - Number of retries remaining (defaults to MAX_RETRIES)
-     * @returns {Promise<Response>} - The fetch response
-     */
-    async function fetchWithTimeout(url, options = {}, timeout = CONSTANTS.FETCH_TIMEOUT_MS, retries = CONSTANTS.MAX_RETRIES) {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-        try {
-            const response = await fetch(url, {
-                ...options,
-                signal: controller.signal
-            });
-
-            // Check for server errors that should trigger retry
-            if (!response.ok && isRetryableError(null, response) && retries > 0) {
-                clearTimeout(timeoutId);
-                const retryDelay = CONSTANTS.RETRY_DELAY_MS * Math.pow(2, CONSTANTS.MAX_RETRIES - retries);
-                console.warn(`Request failed with ${response.status}, retrying in ${retryDelay}ms... (${retries} retries left)`);
-                await delay(retryDelay);
-                return fetchWithTimeout(url, options, timeout, retries - 1);
-            }
-
-            return response;
-        } catch (error) {
-            clearTimeout(timeoutId);
-
-            // Check if error is retryable and we have retries left
-            if (isRetryableError(error) && retries > 0) {
-                const retryDelay = CONSTANTS.RETRY_DELAY_MS * Math.pow(2, CONSTANTS.MAX_RETRIES - retries);
-                console.warn(`Request failed: ${error.message}, retrying in ${retryDelay}ms... (${retries} retries left)`);
-                await delay(retryDelay);
-                return fetchWithTimeout(url, options, timeout, retries - 1);
-            }
-
-            if (error.name === 'AbortError') {
-                throw new Error(`Request timeout after ${timeout}ms (after ${CONSTANTS.MAX_RETRIES - retries} retries)`);
-            }
-            throw error;
-        } finally {
-            clearTimeout(timeoutId);
-        }
-    }
-
     async function checkServerStatus() {
         try {
-            const response = await fetchWithTimeout(`${CONSTANTS.API_BASE_URL}/health`);
-            if (response.ok) {
-                const serverStatus = document.getElementById('serverStatus');
-                if (serverStatus) {
-                    serverStatus.style.display = 'none';
-                }
-                return true;
-            } else {
-                showServerError();
-                return false;
+            await api.get('/health');
+            const serverStatus = document.getElementById('serverStatus');
+            if (serverStatus) {
+                serverStatus.style.display = 'none';
             }
+            return true;
         } catch (error) {
             handleError(error, 'checkServerStatus');
             showServerError();
@@ -353,52 +190,63 @@
         if (serverStatus) {
             serverStatus.style.display = 'block';
         }
-        if (state.dom.stateGrid) {
+        if (dom.stateGrid) {
             const errorDiv = document.createElement('div');
             errorDiv.className = 'error';
             errorDiv.textContent = 'Unable to connect to the server. Please try again later or contact support if the problem persists.';
-            state.dom.stateGrid.replaceChildren();
-            state.dom.stateGrid.appendChild(errorDiv);
+            dom.stateGrid.replaceChildren();
+            dom.stateGrid.appendChild(errorDiv);
         }
     }
 
     async function loadStateData(stateCode) {
+        const dataCache = store.get('dataCache');
+        const loadingStates = store.get('loadingStates');
+
         // Return cached data if available
-        if (state.dataCache.has(stateCode)) {
-            return state.dataCache.get(stateCode);
+        if (dataCache.has(stateCode)) {
+            return dataCache.get(stateCode);
         }
 
         // Prevent duplicate requests for the same state
-        if (state.loadingStates.has(stateCode)) {
+        if (loadingStates.has(stateCode)) {
             return []; // Request already in progress
         }
 
-        // Mark this state as loading (with limit enforcement)
-        stateUtils.addLoadingState(stateCode);
+        // Mark this state as loading (with limit enforcement).
+        // Returning the same Set reference still notifies because the store's
+        // shallow-equality short-circuits Map/Set to false by design.
+        store.update('loadingStates', s => {
+            if (s.size >= STATE_LIMITS.MAX_LOADING_STATES) {
+                console.warn('Too many loading states, clearing oldest');
+                const firstState = s.values().next().value;
+                s.delete(firstState);
+            }
+            s.add(stateCode);
+            return s;
+        });
 
         try {
-            const response = await fetchWithTimeout(`${CONSTANTS.API_BASE_URL}/states/${stateCode}`);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const result = await response.json();
+            const data = await api.get(`/states/${stateCode}`);
 
-            // Validate API response
-            const validation = validateApiResponse(result);
-            if (!validation.valid) {
-                throw new Error(validation.error);
+            if (!Array.isArray(data)) {
+                throw new Error('Invalid data format: expected array');
             }
 
             // Filter out invalid shop entries
-            const stateShops = validation.data.filter(isValidShop);
+            const stateShops = data.filter(isValidShop);
 
-            // Cache with size limit enforcement
-            stateUtils.setCacheEntry(stateCode, stateShops);
+            // Cache with LRU eviction (LruMap enforces MAX_CACHE_SIZE internally).
+            store.update('dataCache', cache => {
+                cache.set(stateCode, stateShops);
+                return cache;
+            });
 
-            const stateInfo = state.availableStates.find(s => s.code === stateCode);
-            if (stateInfo) {
-                stateInfo.loaded = true;
-            }
+            // Mark the availableStates entry as loaded. We replace the array so
+            // subscribers fire (mutating in place + set(sameRef) no-ops for arrays).
+            store.update('availableStates', list =>
+                list.map(s => s.code === stateCode ? { ...s, loaded: true } : s)
+            );
 
             updateStateCard(stateCode, stateShops);
 
@@ -407,56 +255,48 @@
             handleError(error, `loadStateData(${stateCode})`);
             return [];
         } finally {
-            // Always remove from loading set when done
-            state.loadingStates.delete(stateCode);
+            // Always remove from loading set when done.
+            store.update('loadingStates', s => { s.delete(stateCode); return s; });
         }
     }
 
     async function initializeStateList() {
         try {
-            const response = await fetchWithTimeout(`${CONSTANTS.API_BASE_URL}/states`);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const result = await response.json();
+            const data = await api.get('/states');
 
-            // Validate API response
-            const validation = validateApiResponse(result);
-            if (!validation.valid) {
-                throw new Error(validation.error);
+            if (!Array.isArray(data)) {
+                throw new Error('Invalid data format: expected array');
             }
 
-            // Filter and process valid state data from API
-            state.availableStates = validation.data
+            // Build a sorted-by-code list of state metadata. Sort eagerly so we
+            // write the final shape to the store exactly once.
+            const availableStates = data
                 .filter(isValidStateInfo)
                 .map(stateInfo => ({
                     code: stateInfo.state_code,
                     shopCount: stateInfo.shop_count,
                     avgPriceLevel: stateInfo.avg_price_level,
                     loaded: false
-                }));
+                }))
+                .sort((a, b) => a.code.localeCompare(b.code));
+
+            store.set('availableStates', availableStates);
 
             // Add states to filter dropdown
-            state.availableStates.forEach(stateInfo => {
+            availableStates.forEach(stateInfo => {
                 const option = document.createElement('option');
                 option.value = stateInfo.code;
-                option.textContent = getStateName(stateInfo.code);
-                state.dom.stateFilter.appendChild(option);
+                option.textContent = stateName(stateInfo.code);
+                dom.stateFilter.appendChild(option);
             });
-
-            // Sort states for consistency
-            state.availableStates.sort((a, b) => a.code.localeCompare(b.code));
-
-            // Create initial state grid
-            createStateGrid();
         } catch (error) {
             handleError(error, 'initializeStateList');
-            if (state.dom.stateGrid) {
+            if (dom.stateGrid) {
                 const errorDiv = document.createElement('div');
                 errorDiv.className = 'error';
                 errorDiv.textContent = 'Error loading state data. Please make sure the server is running.';
-                state.dom.stateGrid.replaceChildren();
-                state.dom.stateGrid.appendChild(errorDiv);
+                dom.stateGrid.replaceChildren();
+                dom.stateGrid.appendChild(errorDiv);
             }
         }
     }
@@ -466,13 +306,13 @@
     // ============================================================================
 
     function createStateGrid() {
-        if (!state.dom.stateGrid) return;
+        if (!dom.stateGrid) return;
 
-        state.dom.stateGrid.replaceChildren();
+        dom.stateGrid.replaceChildren();
 
         const fragment = document.createDocumentFragment();
 
-        state.availableStates.forEach(stateInfo => {
+        store.get('availableStates').forEach(stateInfo => {
             const stateCard = document.createElement('div');
             stateCard.className = 'state-card';
             stateCard.id = `state-card-${stateInfo.code}`;
@@ -480,16 +320,16 @@
 
             const link = document.createElement('a');
             link.href = `/html/state.html?code=${stateInfo.code}`;
-            link.setAttribute('aria-label', `${getStateName(stateInfo.code)}: ${stateInfo.shopCount} coffee shops`);
+            link.setAttribute('aria-label', `${stateName(stateInfo.code)}: ${stateInfo.shopCount} coffee shops`);
 
             const h2 = document.createElement('h2');
-            h2.textContent = getStateName(stateInfo.code);
+            h2.textContent = stateName(stateInfo.code);
 
             const p1 = document.createElement('p');
             p1.textContent = `${stateInfo.shopCount} coffee shops`;
 
             const p2 = document.createElement('p');
-            p2.textContent = `Avg. price: ${stateInfo.avgPriceLevel ? calculateAveragePriceFromLevel(stateInfo.avgPriceLevel) : 'N/A'}`;
+            p2.textContent = `Avg. price: ${Price.averageFromNumeric(stateInfo.avgPriceLevel).label}`;
 
             link.appendChild(h2);
             link.appendChild(p1);
@@ -498,7 +338,7 @@
 
             // Preload data on hover
             stateCard.addEventListener('mouseenter', () => {
-                if (!state.dataCache.has(stateInfo.code)) {
+                if (!store.get('dataCache').has(stateInfo.code)) {
                     loadStateData(stateInfo.code).catch(err =>
                         handleError(err, `mouseenter-${stateInfo.code}`)
                     );
@@ -511,7 +351,7 @@
             scheduleIdleLoad(stateInfo.code);
         });
 
-        state.dom.stateGrid.appendChild(fragment);
+        dom.stateGrid.appendChild(fragment);
     }
 
     function scheduleIdleLoad(stateCode) {
@@ -537,13 +377,13 @@
         const stateCard = document.getElementById(`state-card-${stateCode}`);
         if (!stateCard) return;
 
-        const stateName = getStateName(stateCode);
-        const avgPrice = calculateAveragePrice(shops);
+        const fullStateName = stateName(stateCode);
+        const avgPrice = Price.average(shops.map(s => Price.fromKey(s.priceLevel))).label;
 
         const h2 = stateCard.querySelector('h2');
         const paragraphs = stateCard.querySelectorAll('p');
 
-        if (h2) h2.textContent = stateName;
+        if (h2) h2.textContent = fullStateName;
         if (paragraphs[0]) paragraphs[0].textContent = `${shops.length} coffee shops`;
         if (paragraphs[1]) paragraphs[1].textContent = `Avg. price: ${avgPrice}`;
     }
@@ -564,15 +404,17 @@
 
         const stateTag = document.createElement('p');
         stateTag.className = 'state-tag';
-        stateTag.textContent = getStateName(shop.state);
+        stateTag.textContent = stateName(shop.state);
         item.appendChild(stateTag);
 
         if (shop.priceLevel) {
+            const priceInfo = Price.fromKey(shop.priceLevel);
+            const priceLabel = priceInfo.label.toLowerCase();
             const price = document.createElement('span');
-            price.className = `price-level ${getPriceLevelClass(shop.priceLevel)}`;
-            price.textContent = formatPriceLevel(shop.priceLevel);
+            price.className = `price-level ${priceInfo.cssClass}`;
+            price.textContent = priceLabel;
             // Add aria-label for screen readers since visual styling conveys meaning
-            price.setAttribute('aria-label', `Price level: ${formatPriceLevel(shop.priceLevel)}`);
+            price.setAttribute('aria-label', `Price level: ${priceLabel}`);
             item.appendChild(price);
         }
 
@@ -580,28 +422,28 @@
     }
 
     function displayResults(shops) {
-        if (!state.dom.searchResultsContainer) return;
+        if (!dom.searchResultsContainer) return;
 
-        state.dom.searchResultsContainer.replaceChildren();
-        state.resultsElements = [];
-        stateUtils.resetLoadMoreState();
+        dom.searchResultsContainer.replaceChildren();
+        resultsElements.length = 0;
+        store.set('loadMoreState', { shops: [], currentlyShowing: 0 });
 
         const header = document.createElement('h2');
         header.textContent = 'Search Results';
-        state.dom.searchResultsContainer.appendChild(header);
+        dom.searchResultsContainer.appendChild(header);
 
         if (shops.length === 0) {
             const noResults = document.createElement('div');
             noResults.className = 'no-results';
             noResults.textContent = 'No coffee shops found';
-            state.dom.searchResultsContainer.appendChild(noResults);
+            dom.searchResultsContainer.appendChild(noResults);
             return;
         }
 
         const resultCount = document.createElement('p');
         resultCount.className = 'result-count';
         resultCount.textContent = `${shops.length} found`;
-        state.dom.searchResultsContainer.appendChild(resultCount);
+        dom.searchResultsContainer.appendChild(resultCount);
 
         const fragment = document.createDocumentFragment();
         const shopsToRender = shops.length > CONSTANTS.SEARCH_RESULTS_PER_PAGE
@@ -610,32 +452,34 @@
 
         shopsToRender.forEach(shop => {
             const item = createShopElement(shop);
-            state.resultsElements.push(item);
+            resultsElements.push(item);
             fragment.appendChild(item);
         });
 
-        state.dom.searchResultsContainer.appendChild(fragment);
+        dom.searchResultsContainer.appendChild(fragment);
 
         if (shops.length > CONSTANTS.SEARCH_RESULTS_PER_PAGE) {
-            // Store pagination state for event delegation
-            state.loadMoreState.shops = shops;
-            state.loadMoreState.currentlyShowing = CONSTANTS.SEARCH_RESULTS_PER_PAGE;
+            // Persist pagination cursor for the Load More handler.
+            store.set('loadMoreState', {
+                shops,
+                currentlyShowing: CONSTANTS.SEARCH_RESULTS_PER_PAGE
+            });
 
             const loadMoreButton = document.createElement('button');
             loadMoreButton.className = 'load-more';
             loadMoreButton.textContent = `Load More (${shops.length - CONSTANTS.SEARCH_RESULTS_PER_PAGE} remaining)`;
             loadMoreButton.setAttribute('aria-label', `Load ${shops.length - CONSTANTS.SEARCH_RESULTS_PER_PAGE} more results`);
             // No individual click handler - uses event delegation
-            state.dom.searchResultsContainer.appendChild(loadMoreButton);
+            dom.searchResultsContainer.appendChild(loadMoreButton);
         }
 
         // Move focus to results for screen reader users
-        state.dom.searchResultsContainer.setAttribute('tabindex', '-1');
-        state.dom.searchResultsContainer.focus();
+        dom.searchResultsContainer.setAttribute('tabindex', '-1');
+        dom.searchResultsContainer.focus();
     }
 
     function loadMoreResults() {
-        const { shops, currentlyShowing } = state.loadMoreState;
+        const { shops, currentlyShowing } = store.get('loadMoreState');
         if (!shops.length || currentlyShowing >= shops.length) return;
 
         const nextBatch = Math.min(currentlyShowing + CONSTANTS.LOAD_MORE_BATCH_SIZE, shops.length);
@@ -645,22 +489,22 @@
 
         additionalShops.forEach(shop => {
             const item = createShopElement(shop);
-            state.resultsElements.push(item);
+            resultsElements.push(item);
             fragment.appendChild(item);
         });
 
-        const loadMoreButton = state.dom.searchResultsContainer.querySelector('.load-more');
-        state.dom.searchResultsContainer.insertBefore(fragment, loadMoreButton);
+        const loadMoreButton = dom.searchResultsContainer.querySelector('.load-more');
+        dom.searchResultsContainer.insertBefore(fragment, loadMoreButton);
 
-        // Update state
-        state.loadMoreState.currentlyShowing = nextBatch;
+        // Advance the pagination cursor (new object reference → subscribers notified).
+        store.update('loadMoreState', prev => ({ ...prev, currentlyShowing: nextBatch }));
 
         if (nextBatch < shops.length) {
             loadMoreButton.textContent = `Load More (${shops.length - nextBatch} remaining)`;
             loadMoreButton.setAttribute('aria-label', `Load ${shops.length - nextBatch} more results`);
         } else {
             loadMoreButton.remove();
-            stateUtils.resetLoadMoreState();
+            store.set('loadMoreState', { shops: [], currentlyShowing: 0 });
         }
     }
 
@@ -688,17 +532,17 @@
         return card;
     }
 
-    // Note: createSkeletonItem is imported from SharedConstants (constants.js)
+    // Note: createSkeletonItem is imported from window.CoffeeShopSkeleton (skeleton.js)
 
     function showLoadingState() {
-        if (!state.dom.searchResultsContainer) return;
+        if (!dom.searchResultsContainer) return;
 
-        state.dom.searchResultsContainer.style.display = 'block';
-        state.dom.searchResultsContainer.replaceChildren();
+        dom.searchResultsContainer.style.display = 'block';
+        dom.searchResultsContainer.replaceChildren();
 
         const h2 = document.createElement('h2');
         h2.textContent = 'Search Results';
-        state.dom.searchResultsContainer.appendChild(h2);
+        dom.searchResultsContainer.appendChild(h2);
 
         // Add accessible loading announcement
         const srText = document.createElement('p');
@@ -706,33 +550,33 @@
         srText.setAttribute('role', 'status');
         srText.setAttribute('aria-live', 'polite');
         srText.textContent = 'Loading search results...';
-        state.dom.searchResultsContainer.appendChild(srText);
+        dom.searchResultsContainer.appendChild(srText);
 
         // Show skeleton loading items
         const fragment = document.createDocumentFragment();
         for (let i = 0; i < 5; i++) {
             fragment.appendChild(createSkeletonItem());
         }
-        state.dom.searchResultsContainer.appendChild(fragment);
+        dom.searchResultsContainer.appendChild(fragment);
 
-        if (state.dom.stateGrid) {
-            state.dom.stateGrid.style.display = 'none';
+        if (dom.stateGrid) {
+            dom.stateGrid.style.display = 'none';
         }
     }
 
     function hideLoadingState() {
         // Remove spinner loading
-        const loading = state.dom.searchResultsContainer?.querySelector('.loading');
+        const loading = dom.searchResultsContainer?.querySelector('.loading');
         if (loading) {
             loading.remove();
         }
         // Remove skeleton items
-        const skeletons = state.dom.searchResultsContainer?.querySelectorAll('.skeleton-item');
+        const skeletons = dom.searchResultsContainer?.querySelectorAll('.skeleton-item');
         if (skeletons) {
             skeletons.forEach(s => s.remove());
         }
         // Remove loading announcement
-        const srText = state.dom.searchResultsContainer?.querySelector('.visually-hidden[role="status"]');
+        const srText = dom.searchResultsContainer?.querySelector('.visually-hidden[role="status"]');
         if (srText) {
             srText.remove();
         }
@@ -743,8 +587,8 @@
      * Shows the state grid so users can still browse by state
      */
     function restoreStateGridVisibility() {
-        if (state.dom.stateGrid) {
-            state.dom.stateGrid.style.display = 'grid';
+        if (dom.stateGrid) {
+            dom.stateGrid.style.display = 'grid';
         }
     }
 
@@ -753,10 +597,10 @@
     // ============================================================================
 
     function debounceSearch() {
-        if (state.searchTimeout) {
-            clearTimeout(state.searchTimeout);
+        if (searchTimeout) {
+            clearTimeout(searchTimeout);
         }
-        state.searchTimeout = setTimeout(() => {
+        searchTimeout = setTimeout(() => {
             searchCoffeeShops().catch(err =>
                 handleError(err, 'debounceSearch')
             );
@@ -764,19 +608,19 @@
     }
 
     async function searchCoffeeShops() {
-        const searchTerm = state.dom.searchInput?.value || '';
-        const selectedState = state.dom.stateFilter?.value || '';
-        const selectedPrice = state.dom.priceFilter?.value || '';
+        const searchTerm = dom.searchInput?.value || '';
+        const selectedState = dom.stateFilter?.value || '';
+        const selectedPrice = dom.priceFilter?.value || '';
 
         // Update URL with search parameters
         updateURLParams({ q: searchTerm, state: selectedState, price: selectedPrice });
 
         if (!searchTerm && !selectedState && !selectedPrice) {
-            if (state.dom.searchResultsContainer) {
-                state.dom.searchResultsContainer.style.display = 'none';
+            if (dom.searchResultsContainer) {
+                dom.searchResultsContainer.style.display = 'none';
             }
-            if (state.dom.stateGrid) {
-                state.dom.stateGrid.style.display = 'grid';
+            if (dom.stateGrid) {
+                dom.stateGrid.style.display = 'grid';
             }
             return;
         }
@@ -784,37 +628,32 @@
         showLoadingState();
 
         try {
-            const params = new URLSearchParams();
-            if (searchTerm) params.append('q', searchTerm);
-            if (selectedState) params.append('state', selectedState);
-            if (selectedPrice) params.append('price', selectedPrice);
+            const data = await api.get('/search', {
+                query: {
+                    q: searchTerm,
+                    state: selectedState,
+                    price: selectedPrice,
+                },
+            });
 
-            const response = await fetchWithTimeout(`${CONSTANTS.API_BASE_URL}/search?${params.toString()}`);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const result = await response.json();
-
-            // Validate API response
-            const validation = validateApiResponse(result);
-            if (!validation.valid) {
-                throw new Error(validation.error);
+            if (!Array.isArray(data)) {
+                throw new Error('Invalid data format: expected array');
             }
 
             // Filter out invalid shop entries
-            const filteredShops = validation.data.filter(isValidShop);
+            const filteredShops = data.filter(isValidShop);
 
             hideLoadingState();
-            state.lastSearchResults = filteredShops;
-            displayResults(filteredShops);
+            // The 'lastSearchResults' subscriber (createStore wiring in initialize)
+            // calls displayResults — no explicit call needed here.
+            store.set('lastSearchResults', filteredShops);
         } catch (error) {
             hideLoadingState();
             handleError(error, 'searchCoffeeShops');
 
             // Hide search results and restore state grid so users can still browse
-            if (state.dom.searchResultsContainer) {
-                state.dom.searchResultsContainer.style.display = 'none';
+            if (dom.searchResultsContainer) {
+                dom.searchResultsContainer.style.display = 'none';
             }
             restoreStateGridVisibility();
 
@@ -836,7 +675,8 @@
                 const shops = await fetchNearbyShops(latitude, longitude);
                 shops.sort((a, b) => a.distance - b.distance);
                 hideLoadingState();
-                displayResults(shops);
+                // Subscriber on 'lastSearchResults' calls displayResults.
+                store.set('lastSearchResults', shops);
             } catch (error) {
                 hideLoadingState();
                 handleError(error, 'findNearbyShops');
@@ -908,9 +748,9 @@
         const priceParam = params.get('price') || '';
 
         // Set form values from URL
-        if (state.dom.searchInput) state.dom.searchInput.value = searchTerm;
-        if (state.dom.stateFilter) state.dom.stateFilter.value = stateParam;
-        if (state.dom.priceFilter) state.dom.priceFilter.value = priceParam;
+        if (dom.searchInput) dom.searchInput.value = searchTerm;
+        if (dom.stateFilter) dom.stateFilter.value = stateParam;
+        if (dom.priceFilter) dom.priceFilter.value = priceParam;
 
         // Trigger search if any params exist
         if (searchTerm || stateParam || priceParam) {
@@ -929,18 +769,18 @@
      * @returns {boolean} True if all required elements found
      */
     function cacheDOMElements() {
-        state.dom.searchResultsContainer = document.getElementById('searchResults');
-        state.dom.stateGrid = document.getElementById('stateGrid');
-        state.dom.searchInput = document.getElementById('searchInput');
-        state.dom.stateFilter = document.getElementById('stateFilter');
-        state.dom.priceFilter = document.getElementById('priceFilter');
-        state.dom.findNearMe = document.getElementById('findNearMe');
+        dom.searchResultsContainer = document.getElementById('searchResults');
+        dom.stateGrid = document.getElementById('stateGrid');
+        dom.searchInput = document.getElementById('searchInput');
+        dom.stateFilter = document.getElementById('stateFilter');
+        dom.priceFilter = document.getElementById('priceFilter');
+        dom.findNearMe = document.getElementById('findNearMe');
 
         // Validate required elements exist
         const requiredElements = ['stateGrid'];
-        const missingElements = requiredElements.filter(id => !state.dom[id]);
-        if (state.dom.findNearMe) {
-            state.dom.findNearMe.addEventListener('click', findNearbyShops);
+        const missingElements = requiredElements.filter(id => !dom[id]);
+        if (dom.findNearMe) {
+            dom.findNearMe.addEventListener('click', findNearbyShops);
         }
 
         if (missingElements.length > 0) {
@@ -975,19 +815,19 @@
     }
 
     function attachEventListeners() {
-        if (state.dom.searchInput) {
-            state.dom.searchInput.addEventListener('input', debounceSearch);
+        if (dom.searchInput) {
+            dom.searchInput.addEventListener('input', debounceSearch);
         }
-        if (state.dom.stateFilter) {
-            state.dom.stateFilter.addEventListener('change', debounceSearch);
+        if (dom.stateFilter) {
+            dom.stateFilter.addEventListener('change', debounceSearch);
         }
-        if (state.dom.priceFilter) {
-            state.dom.priceFilter.addEventListener('change', debounceSearch);
+        if (dom.priceFilter) {
+            dom.priceFilter.addEventListener('change', debounceSearch);
         }
 
         // Event delegation for Load More button - single handler instead of reassigning onclick
-        if (state.dom.searchResultsContainer) {
-            state.dom.searchResultsContainer.addEventListener('click', (event) => {
+        if (dom.searchResultsContainer) {
+            dom.searchResultsContainer.addEventListener('click', (event) => {
                 if (event.target.classList.contains('load-more')) {
                     loadMoreResults();
                 }
@@ -995,8 +835,8 @@
         }
 
         // Keyboard navigation for state grid
-        if (state.dom.stateGrid) {
-            state.dom.stateGrid.addEventListener('keydown', handleGridKeyNavigation);
+        if (dom.stateGrid) {
+            dom.stateGrid.addEventListener('keydown', handleGridKeyNavigation);
             // Cache grid columns and update on resize
             updateGridColumns();
             window.addEventListener('resize', handleResize);
@@ -1008,19 +848,19 @@
      * Used for keyboard navigation performance
      */
     function updateGridColumns() {
-        if (!state.dom.stateGrid) return;
-        const gridStyle = getComputedStyle(state.dom.stateGrid);
-        state.gridColumns = gridStyle.gridTemplateColumns.split(' ').length || 4;
+        if (!dom.stateGrid) return;
+        const gridStyle = getComputedStyle(dom.stateGrid);
+        gridColumns = gridStyle.gridTemplateColumns.split(' ').length || 4;
     }
 
     /**
      * Debounced resize handler to update cached grid columns
      */
     function handleResize() {
-        if (state.resizeTimeout) {
-            clearTimeout(state.resizeTimeout);
+        if (resizeTimeout) {
+            clearTimeout(resizeTimeout);
         }
-        state.resizeTimeout = setTimeout(updateGridColumns, 150);
+        resizeTimeout = setTimeout(updateGridColumns, 150);
     }
 
     /**
@@ -1034,14 +874,14 @@
             return;
         }
 
-        const cards = Array.from(state.dom.stateGrid.querySelectorAll('.state-card a'));
+        const cards = Array.from(dom.stateGrid.querySelectorAll('.state-card a'));
         if (cards.length === 0) return;
 
         const currentIndex = cards.indexOf(document.activeElement);
         if (currentIndex === -1) return;
 
         // Use cached grid columns (calculated once and updated on resize)
-        const columns = state.gridColumns || 4;
+        const columns = gridColumns || 4;
 
         let newIndex = currentIndex;
 
@@ -1090,6 +930,16 @@
             }
 
             attachEventListeners();
+
+            // Per-key subscribers: renderers react to store writes.
+            //   - availableStates → createStateGrid: re-renders the state grid
+            //     whenever the index list of available states is replaced.
+            //   - lastSearchResults → displayResults: re-renders the search
+            //     results list whenever a new search finishes.
+            // Per ADR-0001, there is no subscribeAll — each renderer subscribes
+            // to ONLY the key it actually reads.
+            store.subscribe('availableStates', createStateGrid);
+            store.subscribe('lastSearchResults', displayResults);
 
             const serverIsRunning = await checkServerStatus();
             if (serverIsRunning) {

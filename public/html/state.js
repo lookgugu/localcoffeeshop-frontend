@@ -4,8 +4,38 @@
  * @module state
  */
 
-// Use shared constants and utilities
-const { STATE_NAMES, getPriceLevelClass, formatPriceLevel, calculateAveragePrice, isValidStateCode, createSkeletonItem } = CoffeeShopConstants;
+// Hard dep on enums + skeleton + api-client + store — fail loud if missing
+// (script order is enforced by asset-loader-state.js).
+if (!window.CoffeeShopEnums) {
+    throw new Error('window.CoffeeShopEnums not loaded — check script order in HTML');
+}
+if (!window.CoffeeShopSkeleton) {
+    throw new Error('window.CoffeeShopSkeleton not loaded — check script order in HTML');
+}
+if (!window.ApiClient) {
+    throw new Error('window.ApiClient not loaded — check script order in HTML');
+}
+if (!window.CoffeeShopStore) {
+    throw new Error('window.CoffeeShopStore not loaded — check script order in HTML');
+}
+const { stateName, isStateCode, Price } = window.CoffeeShopEnums;
+const { createSkeletonItem } = window.CoffeeShopSkeleton;
+const api = window.ApiClient;
+const { createStore } = window.CoffeeShopStore;
+
+// Per-page store (ADR-0001): three keys cover all the state-detail view's
+// reactive surface.
+//   - shops:   the list rendered into <ul id="coffeeList"> (null = unloaded)
+//   - loading: skeleton-loading toggle
+//   - error:   user-facing error message (null when no error)
+//
+// `shops` starts as null (not []) so that a successful empty-result load
+// still notifies subscribers (null → [] is a real change; [] → [] is not).
+const store = createStore({
+    shops: null,
+    loading: false,
+    error: null
+});
 
 /**
  * Display an error message in the coffee list
@@ -20,7 +50,7 @@ function showError(message) {
     coffeeList.appendChild(li);
 }
 
-// Note: createSkeletonItem is imported from CoffeeShopConstants (constants.js)
+// Note: createSkeletonItem is imported from window.CoffeeShopSkeleton (skeleton.js)
 
 /**
  * Show skeleton loading state with accessible loading announcement
@@ -100,9 +130,6 @@ function updateMetaTags(stateName, stateCode) {
     if (twitterDesc) twitterDesc.setAttribute('content', description);
 }
 
-// API Configuration
-const API_BASE_URL = window.APP_CONFIG?.API_BASE_URL || '/api/v1';
-
 // Frontend base URL for meta tags and canonical URLs
 let frontendBaseUrl = window.location.origin;
 
@@ -112,9 +139,8 @@ let frontendBaseUrl = window.location.origin;
  */
 async function loadBackendConfig() {
     try {
-        const response = await fetch(`${API_BASE_URL}/config`);
-        const config = await response.json();
-        if (config.frontendUrl) {
+        const config = await api.get('/config');
+        if (config && config.frontendUrl) {
             frontendBaseUrl = config.frontendUrl;
         }
     } catch (error) {
@@ -122,99 +148,132 @@ async function loadBackendConfig() {
     }
 }
 
-/** @constant {number} Timeout for API requests in milliseconds */
-const FETCH_TIMEOUT_MS = 10000;
-
-/** @constant {number} Maximum number of retry attempts for failed requests */
-const MAX_RETRIES = 3;
-
-/** @constant {number} Base delay between retries in milliseconds (exponential backoff) */
-const RETRY_DELAY_MS = 1000;
+// ============================================================================
+// RENDERERS — wired to the store via per-key subscribers below.
+// Each renderer reads only the key it subscribes to.
+// ============================================================================
 
 /**
- * Delay execution for a specified time
- * @param {number} ms - Milliseconds to delay
- * @returns {Promise<void>} Promise that resolves after the delay
+ * Render the shops list + the summary stats (total + avg price).
+ * Triggered by store.subscribe('shops', renderShops). `shops` is null
+ * before the first successful load.
  */
-function delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+function renderShops(shops) {
+    if (shops == null) return;
+
+    const coffeeList = document.getElementById('coffeeList');
+    const totalShops = document.getElementById('totalShops');
+    const avgPrice = document.getElementById('avgPrice');
+
+    coffeeList.textContent = '';
+    totalShops.textContent = shops.length;
+    avgPrice.textContent = Price.average(shops.map(s => Price.fromKey(s.priceLevel))).label;
+
+    if (shops.length === 0) {
+        // Empty-after-load is a UX concern, not an error — but the existing
+        // contract used showError() to surface it. Preserve that.
+        if (!store.get('loading') && store.get('error') === null) {
+            showError('No coffee shops found in this state.');
+        }
+        return;
+    }
+
+    // Sort shops by name (stable copy — never mutate the store value).
+    const sorted = shops.slice().sort((a, b) => {
+        const nameA = a.displayName?.text || '';
+        const nameB = b.displayName?.text || '';
+        return nameA.localeCompare(nameB);
+    });
+
+    const fragment = document.createDocumentFragment();
+    sorted.forEach(shop => {
+        const li = document.createElement('li');
+        li.className = 'coffee-item';
+
+        const h3 = document.createElement('h3');
+        h3.textContent = shop.displayName?.text || 'Unknown';
+        li.appendChild(h3);
+
+        const p = document.createElement('p');
+        p.textContent = shop.formattedAddress || '';
+        li.appendChild(p);
+
+        if (shop.priceLevel) {
+            const priceInfo = Price.fromKey(shop.priceLevel);
+            const priceLabel = priceInfo.label.toLowerCase();
+            const span = document.createElement('span');
+            span.className = 'price-level ' + priceInfo.cssClass;
+            span.textContent = priceLabel;
+            span.setAttribute('aria-label', 'Price level: ' + priceLabel);
+            li.appendChild(span);
+        }
+
+        fragment.appendChild(li);
+    });
+    coffeeList.appendChild(fragment);
 }
 
 /**
- * Check if an error or response should trigger a retry
- * @param {Error|null} error - The error object to check
- * @param {Response|null} [response=null] - The fetch response to check
- * @returns {boolean} True if the error/response is retryable
+ * Toggle skeleton loading visibility.
+ * Triggered by store.subscribe('loading', toggleSkeletonLoading).
  */
-function isRetryableError(error, response = null) {
-    if (error && (error.name === 'AbortError' || error.message.includes('timeout'))) {
-        return true;
+function toggleSkeletonLoading(isLoading) {
+    if (isLoading) {
+        showSkeletonLoading();
+    } else {
+        hideSkeletonLoading();
     }
-    if (error && error.name === 'TypeError' && error.message.includes('fetch')) {
-        return true;
-    }
-    if (response && (response.status >= 500 || response.status === 429)) {
-        return true;
-    }
-    return false;
 }
 
 /**
- * Fetch with timeout and automatic retry support
- * Uses exponential backoff for retries on server errors or timeouts
- * @param {string} url - The URL to fetch
- * @param {number} [timeout=FETCH_TIMEOUT_MS] - Request timeout in milliseconds
- * @param {number} [retries=MAX_RETRIES] - Number of remaining retry attempts
- * @returns {Promise<Response>} The fetch response
- * @throws {Error} When all retries are exhausted or non-retryable error occurs
+ * Show or hide the user-facing error message.
+ * Triggered by store.subscribe('error', showOrHideError).
  */
-async function fetchWithTimeout(url, timeout = FETCH_TIMEOUT_MS, retries = MAX_RETRIES) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
+function showOrHideError(message) {
+    if (message) {
+        document.getElementById('totalShops').textContent = '-';
+        document.getElementById('avgPrice').textContent = '-';
+        showError(message);
+    }
+    // No "hide" action: a successful render replaces the list contents in
+    // renderShops, which clears any prior error <li>.
+}
 
+// Wire subscribers — see ADR-0001 for the rationale on explicit per-key subscriptions.
+store.subscribe('shops', renderShops);
+store.subscribe('loading', toggleSkeletonLoading);
+store.subscribe('error', showOrHideError);
+
+/**
+ * Fetch coffee shops for `stateCode`, pushing results into the store.
+ * Renderers react via subscribers.
+ */
+async function loadStateShops(stateCode) {
+    store.set('loading', true);
+    store.set('error', null);
     try {
-        const response = await fetch(url, { signal: controller.signal });
-
-        // Check for server errors that should trigger retry
-        if (!response.ok && isRetryableError(null, response) && retries > 0) {
-            clearTimeout(timeoutId);
-            const retryDelay = RETRY_DELAY_MS * Math.pow(2, MAX_RETRIES - retries);
-            console.warn(`Request failed with ${response.status}, retrying in ${retryDelay}ms...`);
-            await delay(retryDelay);
-            return fetchWithTimeout(url, timeout, retries - 1);
+        const data = await api.get(`/states/${stateCode}`);
+        if (!Array.isArray(data)) {
+            throw new Error('Invalid data format received from API');
         }
-
-        return response;
-    } catch (error) {
-        clearTimeout(timeoutId);
-
-        // Check if error is retryable
-        if (isRetryableError(error) && retries > 0) {
-            const retryDelay = RETRY_DELAY_MS * Math.pow(2, MAX_RETRIES - retries);
-            console.warn(`Request failed: ${error.message}, retrying in ${retryDelay}ms...`);
-            await delay(retryDelay);
-            return fetchWithTimeout(url, timeout, retries - 1);
-        }
-
-        if (error.name === 'AbortError') {
-            throw new Error('Request timed out. Please try again.');
-        }
-        throw error;
+        store.set('shops', data);
+    } catch (err) {
+        console.error('Error loading coffee shops:', err);
+        store.set('error', 'Error loading coffee shops. Please try again later.');
     } finally {
-        clearTimeout(timeoutId);
+        store.set('loading', false);
     }
 }
 
 /**
- * Load and display coffee shops for the current state
- * Main entry point that handles validation, API fetching, and rendering
- * @returns {Promise<void>}
+ * Page entry point: validate URL params, update title/meta, then fetch.
+ * Rendering is handled by store subscribers.
  */
 async function loadCoffeeShops() {
     const stateCode = getStateCode();
 
     // Validate state code using shared function
-    if (!isValidStateCode(stateCode)) {
+    if (!isStateCode(stateCode)) {
         document.getElementById('pageTitle').textContent = 'Invalid State';
         document.getElementById('totalShops').textContent = '-';
         document.getElementById('avgPrice').textContent = '-';
@@ -223,102 +282,19 @@ async function loadCoffeeShops() {
         return;
     }
 
-    const stateName = STATE_NAMES[stateCode];
+    const fullStateName = stateName(stateCode);
 
     // Update page title and heading
-    document.title = `Coffee Shops in ${stateName} | Local Coffee Shops`;
-    document.getElementById('pageTitle').textContent = `Coffee Shops in ${stateName}`;
+    document.title = `Coffee Shops in ${fullStateName} | Local Coffee Shops`;
+    document.getElementById('pageTitle').textContent = `Coffee Shops in ${fullStateName}`;
 
     // Load backend config to get canonical frontend URL
     await loadBackendConfig();
 
     // Update meta tags for SEO
-    updateMetaTags(stateName, stateCode);
+    updateMetaTags(fullStateName, stateCode);
 
-    // Show skeleton loading
-    showSkeletonLoading();
-
-    try {
-        const response = await fetchWithTimeout(`${API_BASE_URL}/states/${stateCode}`);
-
-        // Validate response
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const result = await response.json();
-
-        // Validate response format
-        if (!result || (result.success === false)) {
-            throw new Error(result?.error?.message || 'Invalid API response');
-        }
-
-        const coffeeShops = Array.isArray(result) ? result : (result.data || []);
-
-        // Validate that we have an array
-        if (!Array.isArray(coffeeShops)) {
-            throw new Error('Invalid data format received from API');
-        }
-
-        // Hide skeleton loading
-        hideSkeletonLoading();
-
-        const coffeeList = document.getElementById('coffeeList');
-        const totalShops = document.getElementById('totalShops');
-        const avgPrice = document.getElementById('avgPrice');
-
-        // Update total shops count
-        totalShops.textContent = coffeeShops.length;
-
-        // Update average price level using shared function
-        avgPrice.textContent = calculateAveragePrice(coffeeShops);
-
-        // Handle empty results
-        if (coffeeShops.length === 0) {
-            showError('No coffee shops found in this state.');
-            return;
-        }
-
-        // Sort shops by name
-        coffeeShops.sort((a, b) => {
-            const nameA = a.displayName?.text || '';
-            const nameB = b.displayName?.text || '';
-            return nameA.localeCompare(nameB);
-        });
-
-        // Display each coffee shop
-        coffeeShops.forEach(shop => {
-            const li = document.createElement('li');
-            li.className = 'coffee-item';
-
-            // Create elements safely using textContent (prevents XSS)
-            const h3 = document.createElement('h3');
-            h3.textContent = shop.displayName?.text || 'Unknown';
-            li.appendChild(h3);
-
-            const p = document.createElement('p');
-            p.textContent = shop.formattedAddress || '';
-            li.appendChild(p);
-
-            if (shop.priceLevel) {
-                const span = document.createElement('span');
-                // Use shared functions for price level
-                span.className = 'price-level ' + getPriceLevelClass(shop.priceLevel);
-                span.textContent = formatPriceLevel(shop.priceLevel);
-                // Add aria-label for screen readers
-                span.setAttribute('aria-label', 'Price level: ' + formatPriceLevel(shop.priceLevel));
-                li.appendChild(span);
-            }
-
-            coffeeList.appendChild(li);
-        });
-    } catch (error) {
-        console.error('Error loading coffee shops:', error);
-        hideSkeletonLoading();
-        document.getElementById('totalShops').textContent = '-';
-        document.getElementById('avgPrice').textContent = '-';
-        showError('Error loading coffee shops. Please try again later.');
-    }
+    await loadStateShops(stateCode);
 }
 
 // Initialize the page

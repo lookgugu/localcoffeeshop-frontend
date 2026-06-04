@@ -61,6 +61,8 @@ downloads/
 eggs/
 .eggs/
 lib/
+!public/lib/
+!tests/unit/lib/
 lib64/
 parts/
 sdist/
@@ -245,3 +247,6 @@ logs/
 # Database Backups
 backups/
 *.db.backup
+
+# Architecture review artifact (lives at project root, outside this repo)
+architecture-review*.html

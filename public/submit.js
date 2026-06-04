@@ -1,29 +1,33 @@
-// API Configuration - uses relative URL to work in any environment
-const API_BASE_URL = window.location.origin.includes('localhost')
-    ? 'http://localhost:3000/api'
-    : '/api';
+// Hard dep on enums + api-client — fail loud if missing
+// (script order is enforced by the HTML).
+if (!window.CoffeeShopEnums) {
+    throw new Error('window.CoffeeShopEnums not loaded — check script order in HTML');
+}
+if (!window.ApiClient) {
+    throw new Error('window.ApiClient not loaded — check script order in HTML');
+}
+const { stateName } = window.CoffeeShopEnums;
+const api = window.ApiClient;
 
 let allCoffeeShops = [];
 let states = new Set();
 
-// Function to get state name from code
-function getStateName(stateCode) {
-    const stateNames = {
-        'AK': 'Alaska', 'AL': 'Alabama', 'AR': 'Arkansas', 'AZ': 'Arizona',
-        'CA': 'California', 'CO': 'Colorado', 'CT': 'Connecticut', 'DE': 'Delaware',
-        'FL': 'Florida', 'GA': 'Georgia', 'HI': 'Hawaii', 'IA': 'Iowa',
-        'ID': 'Idaho', 'IL': 'Illinois', 'IN': 'Indiana', 'KS': 'Kansas',
-        'KY': 'Kentucky', 'LA': 'Louisiana', 'MA': 'Massachusetts', 'MD': 'Maryland',
-        'ME': 'Maine', 'MI': 'Michigan', 'MN': 'Minnesota', 'MO': 'Missouri',
-        'MS': 'Mississippi', 'MT': 'Montana', 'NC': 'North Carolina', 'ND': 'North Dakota',
-        'NE': 'Nebraska', 'NH': 'New Hampshire', 'NJ': 'New Jersey', 'NM': 'New Mexico',
-        'NV': 'Nevada', 'NY': 'New York', 'OH': 'Ohio', 'OK': 'Oklahoma',
-        'OR': 'Oregon', 'PA': 'Pennsylvania', 'RI': 'Rhode Island', 'SC': 'South Carolina',
-        'SD': 'South Dakota', 'TN': 'Tennessee', 'TX': 'Texas', 'UT': 'Utah',
-        'VA': 'Virginia', 'VT': 'Vermont', 'WA': 'Washington', 'WI': 'Wisconsin',
-        'WV': 'West Virginia', 'WY': 'Wyoming'
-    };
-    return stateNames[stateCode] || stateCode;
+/**
+ * Generate a fresh UUID-style idempotency key for a write request.
+ * Prefers crypto.randomUUID (modern browsers); falls back to a v4-shaped
+ * Math.random hex string for the few environments where it's missing.
+ * One call → one key → one logical user-initiated submission.
+ */
+function generateIdempotencyKey() {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+    }
+    // Fallback: RFC4122 v4-shaped string (good enough for dedup)
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+        const r = (Math.random() * 16) | 0;
+        const v = c === 'x' ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+    });
 }
 
 // Function to extract state code from filename
@@ -35,16 +39,18 @@ function getStateFromFilename(filename) {
 // Function to load all coffee shops from API
 async function loadAllCoffeeShops() {
     try {
-        // Fetch states from API instead of JSON files
-        const response = await fetch(`${API_BASE_URL}/states`);
-        const statesData = await response.json();
+        // Fetch states from API
+        const statesData = await api.get('/states');
 
-        // Extract state codes
-        statesData.forEach(state => {
-            if (state.state) {
-                states.add(state.state);
-            }
-        });
+        // Extract state codes (handle both shape `state_code` (new API) and
+        // `state` (legacy)). Guard against non-array responses — a truthy
+        // non-array (e.g. `{}`) would crash on `.forEach`.
+        if (Array.isArray(statesData)) {
+            statesData.forEach(entry => {
+                const code = entry?.state_code || entry?.state;
+                if (code) states.add(code);
+            });
+        }
 
         // Populate state dropdowns
         const stateDropdowns = document.querySelectorAll('#shop-state, #update-state');
@@ -52,7 +58,7 @@ async function loadAllCoffeeShops() {
             Array.from(states).sort().forEach(stateCode => {
                 const option = document.createElement('option');
                 option.value = stateCode;
-                option.textContent = getStateName(stateCode);
+                option.textContent = stateName(stateCode);
                 dropdown.appendChild(option);
             });
         });
@@ -231,7 +237,7 @@ async function handleAddSubmit(event) {
     });
 
     // Create formatted address
-    const formattedAddress = `${address}, ${city}, ${getStateName(state)} ${zip}`;
+    const formattedAddress = `${address}, ${city}, ${stateName(state)} ${zip}`;
 
     // Create new coffee shop object
     const newShop = {
@@ -246,39 +252,31 @@ async function handleAddSubmit(event) {
     };
 
     try {
-        // Send to server
-        const response = await fetch(`${API_BASE_URL}/coffee-shops`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ shop: newShop }),
-        });
+        // Generate a fresh idempotency key for this submit attempt. ApiClient's
+        // internal retries (on 5xx / timeout / network) will reuse the same
+        // key; if the user submits again after a failure, that's a NEW intent
+        // and gets a NEW key. Backend candidate #7 dedups on this header.
+        const idempotencyKey = generateIdempotencyKey();
 
-        const result = await response.json();
+        await api.post('/coffee-shops', { shop: newShop }, { idempotencyKey });
 
-        if (result.success) {
-            // Show success message
-            const successMessage = document.getElementById('add-success');
-            successMessage.style.display = 'block';
+        // Show success message
+        const successMessage = document.getElementById('add-success');
+        successMessage.style.display = 'block';
 
-            // Reset form
-            resetForm('add-form');
+        // Reset form
+        resetForm('add-form');
 
-            // Hide success message after 3 seconds
-            setTimeout(() => {
-                successMessage.style.display = 'none';
-            }, 3000);
-        } else {
-            // Show error message
-            const errorMessage = document.getElementById('add-error');
-            errorMessage.textContent = result.message;
-            errorMessage.style.display = 'block';
-        }
+        // Hide success message after 3 seconds
+        setTimeout(() => {
+            successMessage.style.display = 'none';
+        }, 3000);
     } catch (error) {
         console.error('Error adding coffee shop:', error);
         const errorMessage = document.getElementById('add-error');
-        errorMessage.textContent = 'Error adding coffee shop. Please try again.';
+        errorMessage.textContent = (error && error.message)
+            ? error.message
+            : 'Error adding coffee shop. Please try again.';
         errorMessage.style.display = 'block';
     }
 }
@@ -307,7 +305,7 @@ async function handleUpdateSubmit(event) {
     });
 
     // Create formatted address
-    const formattedAddress = `${address}, ${city}, ${getStateName(state)} ${zip}`;
+    const formattedAddress = `${address}, ${city}, ${stateName(state)} ${zip}`;
 
     // Create updated coffee shop object
     const updatedShop = {
@@ -322,39 +320,28 @@ async function handleUpdateSubmit(event) {
     };
 
     try {
-        // Send to server
-        const response = await fetch(`${API_BASE_URL}/coffee-shops/${id}`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ shop: updatedShop }),
-        });
+        // Fresh idempotency key per submit attempt (see add-handler for rationale).
+        const idempotencyKey = generateIdempotencyKey();
 
-        const result = await response.json();
+        await api.put(`/coffee-shops/${id}`, { shop: updatedShop }, { idempotencyKey });
 
-        if (result.success) {
-            // Show success message
-            const successMessage = document.getElementById('update-success');
-            successMessage.style.display = 'block';
+        // Show success message
+        const successMessage = document.getElementById('update-success');
+        successMessage.style.display = 'block';
 
-            // Reset form
-            resetForm('update-form');
+        // Reset form
+        resetForm('update-form');
 
-            // Hide success message after 3 seconds
-            setTimeout(() => {
-                successMessage.style.display = 'none';
-            }, 3000);
-        } else {
-            // Show error message
-            const errorMessage = document.getElementById('update-error');
-            errorMessage.textContent = result.message;
-            errorMessage.style.display = 'block';
-        }
+        // Hide success message after 3 seconds
+        setTimeout(() => {
+            successMessage.style.display = 'none';
+        }, 3000);
     } catch (error) {
         console.error('Error updating coffee shop:', error);
         const errorMessage = document.getElementById('update-error');
-        errorMessage.textContent = 'Error updating coffee shop. Please try again.';
+        errorMessage.textContent = (error && error.message)
+            ? error.message
+            : 'Error updating coffee shop. Please try again.';
         errorMessage.style.display = 'block';
     }
 }
