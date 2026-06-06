@@ -6,8 +6,9 @@
   "type": "module",
   "scripts": {
     "dev": "npm run build:config && http-server public -p 8080 -c-1",
-    "build": "npm run build:config && npm run build:js && npm run build:css",
+    "build": "npm run build:config && npm run build:js && npm run build:css && npm run build:html",
     "build:config": "node scripts/inject-config.cjs",
+    "build:html": "cp public/html/*.html public/",
     "build:js": "mkdir -p public/dist && npx terser public/frontend.js -o public/dist/app.min.js -c -m && npx terser public/enums.js -o public/dist/enums.min.js -c -m && npx terser public/skeleton.js -o public/dist/skeleton.min.js -c -m && npx terser public/api-client.js -o public/dist/api-client.min.js -c -m && npx terser public/lib/lru-map.js -o public/dist/lru-map.min.js -c -m && npx terser public/store.js -o public/dist/store.min.js -c -m && npx terser public/service-worker-registration.js -o public/dist/service-worker-registration.min.js -c -m && npx terser public/connection-banner.js -o public/dist/connection-banner.min.js -c -m && npx terser public/html/state.js -o public/dist/state.min.js -c -m",
     "build:css": "npx clean-css-cli -o public/dist/styles.min.css styles.css public/styles/about.css public/styles/common.css public/styles/features.css public/styles/home.css public/styles/states.css",
     "test": "vitest",
