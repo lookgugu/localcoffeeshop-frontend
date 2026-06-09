@@ -29,6 +29,31 @@
     <!-- Configuration (generated at build time) -->
     <script src="/config.js"></script>
 
+    <!-- Google Consent Mode default must be queued before gtag config. -->
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('consent', 'default', {
+        'analytics_storage': 'denied',
+        'ad_storage': 'denied',
+        'ad_user_data': 'denied',
+        'ad_personalization': 'denied',
+        'functionality_storage': 'granted',
+        'security_storage': 'granted',
+        'wait_for_update': 500
+      });
+    </script>
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-YVSXN7PM48"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-YVSXN7PM48');
+    </script>
+
     <!-- Asset loader handles CSS and JS paths for production/development -->
     <script src="/asset-loader-state.js"></script>
 </head>
