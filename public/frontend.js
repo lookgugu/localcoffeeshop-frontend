@@ -336,41 +336,16 @@
             link.appendChild(p2);
             stateCard.appendChild(link);
 
-            // Preload data on hover
-            stateCard.addEventListener('mouseenter', () => {
-                if (!store.get('dataCache').has(stateInfo.code)) {
-                    loadStateData(stateInfo.code).catch(err =>
-                        handleError(err, `mouseenter-${stateInfo.code}`)
-                    );
-                }
-            });
-
+            // Do not eagerly load every state's detail page from the homepage.
+            // The /states response already contains the counts/average price
+            // needed for these cards. Fetching /states/:code for every card on
+            // first paint creates a client-side thundering herd (50+ API calls,
+            // ~1MB JSON) and makes the site feel slow. Detail data is fetched
+            // only when the visitor opens a state page.
             fragment.appendChild(stateCard);
-
-            // Load data during idle time with proper fallback
-            scheduleIdleLoad(stateInfo.code);
         });
 
         dom.stateGrid.appendChild(fragment);
-    }
-
-    function scheduleIdleLoad(stateCode) {
-        if ('requestIdleCallback' in window) {
-            requestIdleCallback(() => {
-                loadStateData(stateCode).catch(err =>
-                    handleError(err, `idleLoad-${stateCode}`)
-                );
-            }, { timeout: CONSTANTS.IDLE_CALLBACK_TIMEOUT_MS });
-        } else {
-            // Fallback with staggered loading to avoid overwhelming the server
-            const delay = CONSTANTS.IDLE_CALLBACK_FALLBACK_MIN_MS +
-                         Math.random() * (CONSTANTS.IDLE_CALLBACK_FALLBACK_MAX_MS - CONSTANTS.IDLE_CALLBACK_FALLBACK_MIN_MS);
-            setTimeout(() => {
-                loadStateData(stateCode).catch(err =>
-                    handleError(err, `fallbackLoad-${stateCode}`)
-                );
-            }, delay);
-        }
     }
 
     function updateStateCard(stateCode, shops) {
