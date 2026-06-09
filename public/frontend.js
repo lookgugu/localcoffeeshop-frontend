@@ -7,7 +7,7 @@
     // CONSTANTS (uses shared enums from enums.js)
     // ============================================================================
 
-    // Hard dep on enums + skeleton + api-client + store + lru-map — fail loud
+    // Hard dep on enums + skeleton + api-client + store — fail loud
     // if any are missing instead of silently falling back. Script-load order
     // is enforced by the asset loader (async=false on dynamically-injected tags).
     if (!window.CoffeeShopEnums) {
@@ -22,30 +22,20 @@
     if (!window.CoffeeShopStore) {
         throw new Error('window.CoffeeShopStore not loaded — check script order in HTML');
     }
-    if (!window.CoffeeShopLruMap) {
-        throw new Error('window.CoffeeShopLruMap not loaded — check script order in HTML');
-    }
     const Enums = window.CoffeeShopEnums;
     const { stateName, isStateCode, Price } = Enums;
     const { createSkeletonItem } = window.CoffeeShopSkeleton;
     const api = window.ApiClient;
     const { ApiEnvelopeError, ApiHttpError } = api.errors;
     const { createStore } = window.CoffeeShopStore;
-    const { LruMap } = window.CoffeeShopLruMap;
 
     const CONSTANTS = {
         // Performance Settings
         SEARCH_DEBOUNCE_MS: 300,
-        IDLE_CALLBACK_TIMEOUT_MS: 5000,
-        IDLE_CALLBACK_FALLBACK_MIN_MS: 1000,
-        IDLE_CALLBACK_FALLBACK_MAX_MS: 4000,
 
         // Pagination
         SEARCH_RESULTS_PER_PAGE: 50,
         LOAD_MORE_BATCH_SIZE: 50,
-
-        // Cache Settings
-        CACHE_DURATION_MS: 3600000, // 1 hour
 
         // Network Settings
         INIT_TIMEOUT_MS: 30000   // 30 second timeout for full initialization
@@ -55,23 +45,12 @@
     // STATE — explicit pub/sub Store (ADR-0001)
     // ============================================================================
 
-    // State management limits to prevent memory issues
-    const STATE_LIMITS = {
-        MAX_CACHE_SIZE: 100,        // Max number of cached state data entries
-        MAX_LOADING_STATES: 10,     // Max concurrent loading requests
-        MAX_RESULTS_ELEMENTS: 1000  // Max DOM elements to track
-    };
-
     // The store owns what the rest of the app reacts to. Renderers
     // subscribe per-key; mutations go through store.update / store.set.
-    //   - dataCache: per-state shop data (LruMap caps memory automatically)
-    //   - loadingStates: which state-detail requests are in flight
     //   - availableStates: index of state codes/counts shown on the grid
     //   - lastSearchResults: most recent search result list (for re-renders)
     //   - loadMoreState: pagination cursor for the search-results list
     const store = createStore({
-        dataCache: new LruMap(STATE_LIMITS.MAX_CACHE_SIZE),
-        loadingStates: new Set(),
         availableStates: [],
         lastSearchResults: null,
         loadMoreState: { shops: [], currentlyShowing: 0 }
@@ -199,67 +178,6 @@
         }
     }
 
-    async function loadStateData(stateCode) {
-        const dataCache = store.get('dataCache');
-        const loadingStates = store.get('loadingStates');
-
-        // Return cached data if available
-        if (dataCache.has(stateCode)) {
-            return dataCache.get(stateCode);
-        }
-
-        // Prevent duplicate requests for the same state
-        if (loadingStates.has(stateCode)) {
-            return []; // Request already in progress
-        }
-
-        // Mark this state as loading (with limit enforcement).
-        // Returning the same Set reference still notifies because the store's
-        // shallow-equality short-circuits Map/Set to false by design.
-        store.update('loadingStates', s => {
-            if (s.size >= STATE_LIMITS.MAX_LOADING_STATES) {
-                console.warn('Too many loading states, clearing oldest');
-                const firstState = s.values().next().value;
-                s.delete(firstState);
-            }
-            s.add(stateCode);
-            return s;
-        });
-
-        try {
-            const data = await api.get(`/states/${stateCode}`);
-
-            if (!Array.isArray(data)) {
-                throw new Error('Invalid data format: expected array');
-            }
-
-            // Filter out invalid shop entries
-            const stateShops = data.filter(isValidShop);
-
-            // Cache with LRU eviction (LruMap enforces MAX_CACHE_SIZE internally).
-            store.update('dataCache', cache => {
-                cache.set(stateCode, stateShops);
-                return cache;
-            });
-
-            // Mark the availableStates entry as loaded. We replace the array so
-            // subscribers fire (mutating in place + set(sameRef) no-ops for arrays).
-            store.update('availableStates', list =>
-                list.map(s => s.code === stateCode ? { ...s, loaded: true } : s)
-            );
-
-            updateStateCard(stateCode, stateShops);
-
-            return stateShops;
-        } catch (error) {
-            handleError(error, `loadStateData(${stateCode})`);
-            return [];
-        } finally {
-            // Always remove from loading set when done.
-            store.update('loadingStates', s => { s.delete(stateCode); return s; });
-        }
-    }
-
     async function initializeStateList() {
         try {
             const data = await api.get('/states');
@@ -346,21 +264,6 @@
         });
 
         dom.stateGrid.appendChild(fragment);
-    }
-
-    function updateStateCard(stateCode, shops) {
-        const stateCard = document.getElementById(`state-card-${stateCode}`);
-        if (!stateCard) return;
-
-        const fullStateName = stateName(stateCode);
-        const avgPrice = Price.average(shops.map(s => Price.fromKey(s.priceLevel))).label;
-
-        const h2 = stateCard.querySelector('h2');
-        const paragraphs = stateCard.querySelectorAll('p');
-
-        if (h2) h2.textContent = fullStateName;
-        if (paragraphs[0]) paragraphs[0].textContent = `${shops.length} coffee shops`;
-        if (paragraphs[1]) paragraphs[1].textContent = `Avg. price: ${avgPrice}`;
     }
 
     function createShopElement(shop) {

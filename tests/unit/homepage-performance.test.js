@@ -9,7 +9,7 @@ describe('homepage performance guard', () => {
     // The homepage only needs /states metadata for cards. A previous version
     // scheduled loadStateData(stateInfo.code) for every card, producing a
     // thundering herd of 50+ /states/:code requests on first paint.
-    const createStateGridBody = source.match(/function createStateGrid\(\) \{([\s\S]*?)function updateStateCard/);
+    const createStateGridBody = source.match(/function createStateGrid\(\) \{([\s\S]*?)\n\s{4}\}/);
 
     expect(createStateGridBody).not.toBeNull();
     expect(createStateGridBody[1]).not.toContain('scheduleIdleLoad');
