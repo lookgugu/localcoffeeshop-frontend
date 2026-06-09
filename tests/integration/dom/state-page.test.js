@@ -91,4 +91,34 @@ describe('state.js — invalid API response shape', () => {
     expect(errSpy).toHaveBeenCalled();
     errSpy.mockRestore();
   });
+
+  it('boots immediately when the dynamic state bundle loads after DOMContentLoaded', async () => {
+    Object.defineProperty(document, 'readyState', {
+      configurable: true,
+      value: 'complete',
+    });
+
+    server.use(
+      http.get('*/api/v1/config', () => HttpResponse.json({ success: true, data: { frontendUrl: 'http://localhost' } })),
+      http.get('*/api/v1/states/CA', () => HttpResponse.json({
+        success: true,
+        data: [{
+          id: 1,
+          displayName: { text: 'Cafe Test', languageCode: 'en' },
+          formattedAddress: '1 Test St, Los Angeles, CA',
+          priceLevel: 'PRICE_LEVEL_MODERATE',
+          state: 'CA',
+        }],
+      }))
+    );
+
+    vi.resetModules();
+    await import('../../../public/html/state.js');
+
+    await new Promise((r) => setTimeout(r, 100));
+
+    expect(document.getElementById('pageTitle').textContent).toBe('Coffee Shops in California');
+    expect(document.getElementById('totalShops').textContent).toBe('1');
+    expect(document.querySelector('#coffeeList .coffee-item h3')?.textContent).toBe('Cafe Test');
+  });
 });
