@@ -26,10 +26,6 @@
     consentScript.src = '/consent-banner.js';
     document.head.appendChild(consentScript);
 
-    const analyticsScript = document.createElement('script');
-    analyticsScript.src = '/analytics.js';
-    analyticsScript.async = true;
-    document.head.appendChild(analyticsScript);
 
     const swScript = document.createElement('script');
     swScript.src = assets.swRegistration;
