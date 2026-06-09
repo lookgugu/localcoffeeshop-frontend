@@ -26,16 +26,32 @@
         function gtag() { window.dataLayer.push(arguments); }
         window.gtag = gtag;
 
-        // Set default consent state (denied until user accepts)
-        gtag('consent', 'default', {
-            'analytics_storage': 'denied',
-            'ad_storage': 'denied',
-            'ad_user_data': 'denied',
-            'ad_personalization': 'denied',
-            'functionality_storage': 'granted',
-            'security_storage': 'granted',
-            'wait_for_update': 500
+        // If the HTML page already queued an initial consent default before
+        // gtag config, do not reissue a later default here. Only fall back for
+        // legacy pages that load the banner without the inline pre-gtag block.
+        var hasInitialDefault = window.dataLayer.some(function (entry) {
+            return entry && entry[0] === 'consent' && entry[1] === 'default';
         });
+        if (!hasInitialDefault) {
+            var defaultConsent;
+            try {
+                defaultConsent = window.LocalCoffeeShopConsent
+                    ? window.LocalCoffeeShopConsent.getInitialConsentState()
+                    : null;
+            } catch (e) {
+                defaultConsent = null;
+            }
+            defaultConsent = defaultConsent || {
+                analytics_storage: 'denied',
+                ad_storage: 'denied',
+                ad_user_data: 'denied',
+                ad_personalization: 'denied',
+                functionality_storage: 'granted',
+                security_storage: 'granted',
+                wait_for_update: 500
+            };
+            gtag('consent', 'default', defaultConsent);
+        }
 
         // Enable URL passthrough for better measurement without cookies
         gtag('set', 'url_passthrough', true);
@@ -72,6 +88,9 @@
             if (data) {
                 const parsed = JSON.parse(data);
                 if (parsed.version === CONFIG.CONSENT_VERSION) {
+                    if (window.LocalCoffeeShopConsent && window.LocalCoffeeShopConsent.normalizeConsentState) {
+                        return window.LocalCoffeeShopConsent.normalizeConsentState(parsed.consent);
+                    }
                     return parsed.consent;
                 }
             }

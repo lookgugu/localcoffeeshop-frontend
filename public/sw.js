@@ -3,9 +3,9 @@
 
 // Bump cache version when STATIC_ASSETS changes so existing clients
 // re-precache the new dependency list on activate.
-const CACHE_NAME = 'coffee-shop-v5';
-const STATIC_CACHE = 'coffee-shop-static-v5';
-const API_CACHE = 'coffee-shop-api-v5';
+const CACHE_NAME = 'coffee-shop-v6';
+const STATIC_CACHE = 'coffee-shop-static-v6';
+const API_CACHE = 'coffee-shop-api-v6';
 
 // Static assets to cache on install.
 // IMPORTANT: keep this in sync with the asset loaders — every dist bundle
@@ -27,6 +27,7 @@ const STATIC_ASSETS = [
     '/dist/api-client.min.js',
     '/dist/store.min.js',
     '/analytics.js',
+    '/geo-consent-default.js',
     '/consent-banner.js'
 ];
 
