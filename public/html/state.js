@@ -297,5 +297,12 @@ async function loadCoffeeShops() {
     await loadStateShops(stateCode);
 }
 
-// Initialize the page
-document.addEventListener('DOMContentLoaded', loadCoffeeShops);
+// Initialize the page. The state bundle is injected dynamically by
+// asset-loader-state.js; on cached/mobile loads it can execute after
+// DOMContentLoaded has already fired. In that case, run immediately instead of
+// registering a listener that will never fire.
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadCoffeeShops);
+} else {
+    loadCoffeeShops();
+}
