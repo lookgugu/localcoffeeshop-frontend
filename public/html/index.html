@@ -31,18 +31,25 @@
     <script src="/config.js"></script>
 
     <!-- Google Consent Mode default must be queued before gtag config. -->
+    <script src="/geo-consent-default.js"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
-      gtag('consent', 'default', {
-        'analytics_storage': 'denied',
-        'ad_storage': 'denied',
-        'ad_user_data': 'denied',
-        'ad_personalization': 'denied',
-        'functionality_storage': 'granted',
-        'security_storage': 'granted',
-        'wait_for_update': 500
-      });
+      var initialConsent = {
+        analytics_storage: 'denied',
+        ad_storage: 'denied',
+        ad_user_data: 'denied',
+        ad_personalization: 'denied',
+        functionality_storage: 'granted',
+        security_storage: 'granted',
+        wait_for_update: 500
+      };
+      try {
+        if (window.LocalCoffeeShopConsent) {
+          initialConsent = window.LocalCoffeeShopConsent.getInitialConsentState();
+        }
+      } catch (e) {}
+      gtag('consent', 'default', initialConsent);
     </script>
 
     <!-- Google tag (gtag.js) -->
