@@ -271,7 +271,9 @@ async function loadStateShops(stateCode) {
  * @returns {string|null} priceRange string, or null when unknown
  */
 function priceRangeSymbol(priceLevel) {
-    const numeric = Price.fromKey(priceLevel).numeric;
+    if (!priceLevel) return null;
+    const priceInfo = Price.fromKey(priceLevel);
+    const numeric = priceInfo && typeof priceInfo.numeric === 'number' ? priceInfo.numeric : 0;
     return numeric > 0 ? '$'.repeat(numeric) : null;
 }
 

@@ -17,25 +17,26 @@ const path = require('path');
 
 // enums.js is the single source of truth for supported states. The repo is an
 // ES module package ("type": "module"), so its UMD module.exports branch does
-// not fire under require(); instead we parse the frozen STATE_NAMES map out of
-// the source text. This keeps the sitemap in sync with the app's state list.
+// not fire under require(). Instead we execute the (first-party, trusted) source
+// in a vm sandbox that exposes a `window`, so the UMD attaches CoffeeShopEnums
+// there, and read the supported states off its public allStates() API. This is
+// robust to reformatting of enums.js (no source-text parsing).
 function loadStates() {
+  const vm = require('vm');
   const src = fs.readFileSync(
     path.join(__dirname, '..', 'public', 'enums.js'),
     'utf8'
   );
-  const start = src.indexOf('STATE_NAMES');
-  const open = src.indexOf('{', start);
-  const close = src.indexOf('})', open);
-  const block = src.slice(open, close);
-  const states = [];
-  const re = /\b([A-Z]{2}):\s*'([^']+)'/g;
-  let m;
-  while ((m = re.exec(block))) {
-    states.push({ code: m[1], name: m[2] });
+  const sandbox = { window: {} };
+  vm.createContext(sandbox);
+  vm.runInContext(src, sandbox, { filename: 'enums.js' });
+
+  const enums = sandbox.window.CoffeeShopEnums;
+  if (!enums || typeof enums.allStates !== 'function') {
+    throw new Error('Could not load CoffeeShopEnums.allStates() from enums.js');
   }
-  states.sort((a, b) => a.name.localeCompare(b.name));
-  return states;
+  // allStates() returns [{ code, name }, ...] already sorted by name.
+  return enums.allStates();
 }
 
 const BASE_URL = 'https://localcoffeeshop.co';

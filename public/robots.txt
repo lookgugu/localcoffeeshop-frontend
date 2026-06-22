@@ -18,50 +18,32 @@ Allow: /manifest.json
 # Note: Crawl-delay intentionally removed to avoid slowing large crawls/indexing.
 
 # --- AI / agentic crawlers explicitly welcomed ---
+# A crawler matching a specific User-agent group ignores the wildcard (*) group,
+# so the User-agents are stacked into one shared group that repeats the same
+# Disallow rules — otherwise these bots would be free to crawl /api/, /metrics,
+# etc. that the * group blocks.
 User-agent: GPTBot
-Allow: /
-
 User-agent: OAI-SearchBot
-Allow: /
-
 User-agent: ChatGPT-User
-Allow: /
-
 User-agent: ClaudeBot
-Allow: /
-
 User-agent: Claude-User
-Allow: /
-
 User-agent: anthropic-ai
-Allow: /
-
 User-agent: PerplexityBot
-Allow: /
-
 User-agent: Perplexity-User
-Allow: /
-
 User-agent: Google-Extended
-Allow: /
-
 User-agent: Applebot-Extended
-Allow: /
-
 User-agent: Bytespider
-Allow: /
-
 User-agent: CCBot
-Allow: /
-
 User-agent: Amazonbot
-Allow: /
-
 User-agent: Meta-ExternalAgent
-Allow: /
-
 User-agent: Diffbot
 Allow: /
+Disallow: /api/
+Disallow: /metrics
+Disallow: /node_modules/
+Disallow: /*.json$
+Disallow: /*.log$
+Allow: /manifest.json
 
 # Sitemap location
 Sitemap: https://localcoffeeshop.co/sitemap.xml
