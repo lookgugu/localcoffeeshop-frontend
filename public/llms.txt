@@ -1,0 +1,33 @@
+# Local Coffee Shops
+
+> A community-driven directory for discovering local, independent coffee shops across all 50 US states.
+
+Local Coffee Shops (https://localcoffeeshop.co) is a free directory that helps people find independent, neighborhood coffee shops and cafes across the United States. Listings are community-submitted and can be browsed by state and city, filtered by price level, and explored by amenities such as WiFi, power outlets, and pet-friendly seating.
+
+## Core pages
+
+- [Home](https://localcoffeeshop.co/): Search and browse coffee shops by state.
+- [About](https://localcoffeeshop.co/about): Who we are and our mission to support local coffee shops.
+- [Submit a shop](https://localcoffeeshop.co/submit): Add a local coffee shop to the directory.
+- [Contact](https://localcoffeeshop.co/pages/contact.html): Get in touch with the team.
+
+## Browse by state
+
+All 50 US states are covered. Each state has a page listing its coffee shops, following the pattern `https://localcoffeeshop.co/html/state.html?code=XX` where `XX` is the two-letter US state code. A representative subset:
+
+- [California](https://localcoffeeshop.co/html/state.html?code=CA)
+- [New York](https://localcoffeeshop.co/html/state.html?code=NY)
+- [Texas](https://localcoffeeshop.co/html/state.html?code=TX)
+- [Florida](https://localcoffeeshop.co/html/state.html?code=FL)
+- [Washington](https://localcoffeeshop.co/html/state.html?code=WA)
+- [Oregon](https://localcoffeeshop.co/html/state.html?code=OR)
+- [Illinois](https://localcoffeeshop.co/html/state.html?code=IL)
+- [Colorado](https://localcoffeeshop.co/html/state.html?code=CO)
+- [Massachusetts](https://localcoffeeshop.co/html/state.html?code=MA)
+- [Pennsylvania](https://localcoffeeshop.co/html/state.html?code=PA)
+
+All 50 states are listed in the [sitemap](https://localcoffeeshop.co/sitemap.xml).
+
+## About the data
+
+Coffee shop listings are community-submitted by coffee enthusiasts and shop owners. Each listing can be searched and filtered by state, city, and price level, and includes features such as WiFi availability, power outlets, and pet-friendly seating. The directory is maintained to help coffee lovers discover and support independent local cafes.
