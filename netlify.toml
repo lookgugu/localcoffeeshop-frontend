@@ -14,7 +14,13 @@
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    X-XSS-Protection = "1; mode=block"
+    # NOTE: script-src keeps 'unsafe-inline' because index.html/state.html embed
+    # inline gtag/consent bootstrap scripts. Everything else is locked down.
+    # X-XSS-Protection is intentionally omitted (deprecated; superseded by CSP).
+    # This header applies to /*, so it must also allow the third-party assets the
+    # static state/shop pages already use: Leaflet (unpkg.com), Font Awesome
+    # (cdnjs.cloudflare.com), Unsplash images, and OpenStreetMap map tiles.
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https://i.pravatar.cc https://images.unsplash.com https://unpkg.com https://*.tile.openstreetmap.org https://www.google-analytics.com https://www.googletagmanager.com; connect-src 'self' https://api.localcoffeeshop.co https://www.google-analytics.com https://region1.google-analytics.com; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'"
 
 # Cache static assets
 [[headers]]
@@ -48,14 +54,17 @@
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
-# SPA-like routing - serve appropriate HTML for unknown paths
+# State deep-links render the (client-hydrated) state page.
 [[redirects]]
   from = "/states/*"
   to = "/html/state.html"
   status = 200
 
+# Unknown paths return a real 404 (not a 200 homepage) so search engines don't
+# index infinite duplicates of the homepage as soft-404s. force = false lets
+# real files (/, /about.html, /pages/*, /sitemap.xml, …) be served first.
 [[redirects]]
   from = "/*"
-  to = "/html/index.html"
-  status = 200
+  to = "/404.html"
+  status = 404
   force = false
