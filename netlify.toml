@@ -20,7 +20,9 @@
     # This header applies to /*, so it must also allow the third-party assets the
     # static state/shop pages already use: Leaflet (unpkg.com), Font Awesome
     # (cdnjs.cloudflare.com), Unsplash images, and OpenStreetMap map tiles.
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https://i.pravatar.cc https://images.unsplash.com https://unpkg.com https://*.tile.openstreetmap.org https://www.google-analytics.com https://www.googletagmanager.com; connect-src 'self' https://api.localcoffeeshop.co https://www.google-analytics.com https://region1.google-analytics.com; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'"
+    # unpkg is path-scoped to the pinned Leaflet version (not the whole origin,
+    # which hosts arbitrary npm packages and would be a CSP-bypass surface).
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com https://unpkg.com/leaflet@1.7.1/; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com/leaflet@1.7.1/ https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: https://i.pravatar.cc https://images.unsplash.com https://unpkg.com/leaflet@1.7.1/ https://*.tile.openstreetmap.org https://www.google-analytics.com https://www.googletagmanager.com; connect-src 'self' https://api.localcoffeeshop.co https://www.google-analytics.com https://region1.google-analytics.com; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'"
 
 # Cache static assets
 [[headers]]
@@ -59,6 +61,24 @@
   from = "/states/*"
   to = "/html/state.html"
   status = 200
+
+# Extensionless in-site nav links (used across the static pages) map to the
+# real files. These must precede the catch-all, otherwise the new 404 turns
+# these existing navigations into hard 404s.
+[[redirects]]
+  from = "/pages/about"
+  to = "/about.html"
+  status = 301
+
+[[redirects]]
+  from = "/pages/contact"
+  to = "/pages/contact.html"
+  status = 301
+
+[[redirects]]
+  from = "/pages/states"
+  to = "/pages/states/"
+  status = 301
 
 # Unknown paths return a real 404 (not a 200 homepage) so search engines don't
 # index infinite duplicates of the homepage as soft-404s. force = false lets
