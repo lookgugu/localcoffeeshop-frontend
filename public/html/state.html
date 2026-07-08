@@ -3,6 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Warm up the cross-origin API + analytics connections before the app
+         fetches this state's shops (the LCP element). -->
+    <link rel="preconnect" href="https://api.localcoffeeshop.co" crossorigin>
+    <link rel="dns-prefetch" href="https://api.localcoffeeshop.co">
+    <link rel="preconnect" href="https://www.googletagmanager.com">
+
     <meta name="description" id="metaDescription" content="Find local coffee shops. Browse cafes by price level and location.">
     <meta name="keywords" content="coffee shops, local coffee, cafes, coffee near me">
     <meta name="robots" content="index, follow">
