@@ -266,6 +266,99 @@ async function loadStateShops(stateCode) {
 }
 
 /**
+ * Map a price-level enum to a schema.org priceRange string ($, $$, $$$).
+ * @param {string} priceLevel - Price level key from the API
+ * @returns {string|null} priceRange string, or null when unknown
+ */
+function priceRangeSymbol(priceLevel) {
+    if (!priceLevel) return null;
+    const priceInfo = Price.fromKey(priceLevel);
+    const numeric = priceInfo && typeof priceInfo.numeric === 'number' ? priceInfo.numeric : 0;
+    return numeric > 0 ? '$'.repeat(numeric) : null;
+}
+
+/**
+ * Inject (or replace) a JSON-LD structured-data block describing this state's
+ * coffee-shop listing. Emits a @graph with:
+ *   - BreadcrumbList (Home > Coffee Shops in {state})
+ *   - CollectionPage about the state (AdministrativeArea), whose mainEntity is
+ *     an ItemList of the loaded shops as CafeOrCoffeeShop items.
+ *
+ * This gives search engines and AI answer engines that render the page rich,
+ * machine-readable context about which shops are listed for the state.
+ *
+ * @param {string} fullStateName - e.g. "California"
+ * @param {string} stateCode - two-letter code, e.g. "CA"
+ * @param {Array<Object>} shops - loaded shop records (may be empty)
+ */
+function injectStructuredData(fullStateName, stateCode, shops) {
+    const pageUrl = `${frontendBaseUrl}/html/state.html?code=${stateCode}`;
+    const list = Array.isArray(shops) ? shops : [];
+
+    const itemListElement = list.map((shop, i) => {
+        const business = {
+            '@type': 'CafeOrCoffeeShop',
+            name: shop.displayName?.text || 'Coffee shop',
+            address: shop.formattedAddress || undefined,
+            areaServed: fullStateName
+        };
+        const priceRange = priceRangeSymbol(shop.priceLevel);
+        if (priceRange) business.priceRange = priceRange;
+        return {
+            '@type': 'ListItem',
+            position: i + 1,
+            item: business
+        };
+    });
+
+    const graph = [
+        {
+            '@type': 'BreadcrumbList',
+            itemListElement: [
+                { '@type': 'ListItem', position: 1, name: 'Home', item: `${frontendBaseUrl}/` },
+                { '@type': 'ListItem', position: 2, name: `Coffee Shops in ${fullStateName}`, item: pageUrl }
+            ]
+        },
+        {
+            '@type': 'CollectionPage',
+            '@id': pageUrl,
+            url: pageUrl,
+            name: `Coffee Shops in ${fullStateName}`,
+            description: `Discover local coffee shops in ${fullStateName}. Browse cafes, compare price levels, and find your next favorite coffee spot.`,
+            isPartOf: {
+                '@type': 'WebSite',
+                name: 'Local Coffee Shops',
+                url: `${frontendBaseUrl}/`
+            },
+            about: {
+                '@type': 'AdministrativeArea',
+                name: fullStateName,
+                containedInPlace: { '@type': 'Country', name: 'United States' }
+            },
+            mainEntity: {
+                '@type': 'ItemList',
+                name: `Coffee shops in ${fullStateName}`,
+                numberOfItems: itemListElement.length,
+                itemListElement
+            }
+        }
+    ];
+
+    const json = JSON.stringify({ '@context': 'https://schema.org', '@graph': graph })
+        // Prevent a stray "</script>" in any field from terminating the tag.
+        .replace(/</g, '\\u003c');
+
+    let script = document.getElementById('stateJsonLd');
+    if (!script) {
+        script = document.createElement('script');
+        script.type = 'application/ld+json';
+        script.id = 'stateJsonLd';
+        document.head.appendChild(script);
+    }
+    script.textContent = json;
+}
+
+/**
  * Page entry point: validate URL params, update title/meta, then fetch.
  * Rendering is handled by store subscribers.
  */
@@ -294,7 +387,14 @@ async function loadCoffeeShops() {
     // Update meta tags for SEO
     updateMetaTags(fullStateName, stateCode);
 
+    // Emit baseline structured data immediately (breadcrumb + collection page)
+    // so it is present even if the shop fetch is slow or fails.
+    injectStructuredData(fullStateName, stateCode, []);
+
     await loadStateShops(stateCode);
+
+    // Re-emit with the loaded shop list now populated as an ItemList.
+    injectStructuredData(fullStateName, stateCode, store.get('shops') || []);
 }
 
 // Initialize the page. The state bundle is injected dynamically by

@@ -1,0 +1,16 @@
+{
+  "name": "Local Coffee Shops",
+  "short_name": "Coffee Shops",
+  "description": "Discover local coffee shops across the United States. Search by state, city, and price level, and filter by features like WiFi, power outlets, and pet-friendly seating.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#2C3E50",
+  "theme_color": "#2C3E50",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any"
+    }
+  ]
+}
