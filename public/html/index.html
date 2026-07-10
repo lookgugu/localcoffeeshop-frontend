@@ -3,6 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Warm up the cross-origin API + analytics connections before the app
+         fetches data, so the LCP (client-rendered state grid) isn't gated on a
+         cold DNS+TLS handshake. -->
+    <link rel="preconnect" href="https://api.localcoffeeshop.co" crossorigin>
+    <link rel="dns-prefetch" href="https://api.localcoffeeshop.co">
+    <link rel="preconnect" href="https://www.googletagmanager.com">
+
     <meta name="description" content="Discover local coffee shops across the United States. Search by state, city, and price level. Find the best local cafes near you.">
     <meta name="keywords" content="coffee shops, local coffee, cafes, coffee near me, US coffee shops, coffee directory">
     <meta name="author" content="Local Coffee Shops">

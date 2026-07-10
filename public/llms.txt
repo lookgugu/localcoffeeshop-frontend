@@ -7,26 +7,26 @@ Local Coffee Shops (https://localcoffeeshop.co) is a free directory that helps p
 ## Core pages
 
 - [Home](https://localcoffeeshop.co/): Search and browse coffee shops by state.
-- [About](https://localcoffeeshop.co/about): Who we are and our mission to support local coffee shops.
-- [Submit a shop](https://localcoffeeshop.co/submit): Add a local coffee shop to the directory.
+- [About](https://localcoffeeshop.co/about.html): Who we are and our mission to support local coffee shops.
+- [Submit a shop](https://localcoffeeshop.co/submit.html): Add a local coffee shop to the directory.
 - [Contact](https://localcoffeeshop.co/pages/contact.html): Get in touch with the team.
 
 ## Browse by state
 
-All 50 US states are covered. Each state has a page listing its coffee shops, following the pattern `https://localcoffeeshop.co/html/state.html?code=XX` where `XX` is the two-letter US state code. A representative subset:
+All 50 US states are covered. Each state has a page listing its coffee shops, following the pattern `https://localcoffeeshop.co/pages/states/{state}.html` where `{state}` is the lowercase, hyphenated state name. A representative subset:
 
-- [California](https://localcoffeeshop.co/html/state.html?code=CA)
-- [New York](https://localcoffeeshop.co/html/state.html?code=NY)
-- [Texas](https://localcoffeeshop.co/html/state.html?code=TX)
-- [Florida](https://localcoffeeshop.co/html/state.html?code=FL)
-- [Washington](https://localcoffeeshop.co/html/state.html?code=WA)
-- [Oregon](https://localcoffeeshop.co/html/state.html?code=OR)
-- [Illinois](https://localcoffeeshop.co/html/state.html?code=IL)
-- [Colorado](https://localcoffeeshop.co/html/state.html?code=CO)
-- [Massachusetts](https://localcoffeeshop.co/html/state.html?code=MA)
-- [Pennsylvania](https://localcoffeeshop.co/html/state.html?code=PA)
+- [California](https://localcoffeeshop.co/pages/states/california.html)
+- [New York](https://localcoffeeshop.co/pages/states/new-york.html)
+- [Texas](https://localcoffeeshop.co/pages/states/texas.html)
+- [Florida](https://localcoffeeshop.co/pages/states/florida.html)
+- [Washington](https://localcoffeeshop.co/pages/states/washington.html)
+- [Oregon](https://localcoffeeshop.co/pages/states/oregon.html)
+- [Illinois](https://localcoffeeshop.co/pages/states/illinois.html)
+- [Colorado](https://localcoffeeshop.co/pages/states/colorado.html)
+- [Massachusetts](https://localcoffeeshop.co/pages/states/massachusetts.html)
+- [Pennsylvania](https://localcoffeeshop.co/pages/states/pennsylvania.html)
 
-All 50 states are listed in the [sitemap](https://localcoffeeshop.co/sitemap.xml).
+All states are listed in the [sitemap](https://localcoffeeshop.co/sitemap.xml).
 
 ## About the data
 

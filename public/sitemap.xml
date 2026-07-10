@@ -2,337 +2,331 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://localcoffeeshop.co/</loc>
-    <lastmod>2026-06-22</lastmod>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/about</loc>
-    <lastmod>2026-06-22</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.6</priority>
-  </url>
-  <url>
-    <loc>https://localcoffeeshop.co/submit</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/about.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
+    <loc>https://localcoffeeshop.co/submit.html</loc>
+    <lastmod>2026-07-10</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://localcoffeeshop.co/pages/contact.html</loc>
-    <lastmod>2026-06-22</lastmod>
-    <changefreq>yearly</changefreq>
+    <lastmod>2026-07-10</lastmod>
+    <changefreq>monthly</changefreq>
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=AL</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/</loc>
+    <lastmod>2026-07-10</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://localcoffeeshop.co/pages/states/alabama.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=AK</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/alaska.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=AZ</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/arizona.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=AR</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/arkansas.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=CA</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/california.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=CO</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/colorado.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=CT</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/connecticut.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=DE</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/delaware.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=FL</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/florida.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=GA</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/georgia.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=HI</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/hawaii.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=ID</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/idaho.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=IL</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/illinois.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=IN</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/indiana.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=IA</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/iowa.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=KS</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/kansas.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=KY</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/kentucky.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=LA</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/louisiana.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=ME</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/maine.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=MD</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/maryland.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=MA</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/massachusetts.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=MI</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/michigan.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=MN</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/minnesota.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=MS</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/mississippi.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=MO</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/missouri.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=MT</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/montana.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=NE</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/nebraska.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=NV</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/nevada.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=NH</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/new-hampshire.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=NJ</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/new-jersey.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=NM</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/new-mexico.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=NY</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/new-york.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=NC</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/north-carolina.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=ND</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/north-dakota.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=OH</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/ohio.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=OK</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/oklahoma.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=OR</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/oregon.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=PA</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/pennsylvania.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=PR</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/rhode-island.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=RI</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/south-carolina.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=SC</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/south-dakota.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=SD</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/tennessee.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=TN</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/texas.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=TX</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/utah.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=UT</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/vermont.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=VT</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/virginia.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=VA</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/washington.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=WA</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/west-virginia.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=DC</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/wisconsin.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=WV</loc>
-    <lastmod>2026-06-22</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=WI</loc>
-    <lastmod>2026-06-22</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://localcoffeeshop.co/html/state.html?code=WY</loc>
-    <lastmod>2026-06-22</lastmod>
+    <loc>https://localcoffeeshop.co/pages/states/wyoming.html</loc>
+    <lastmod>2026-07-10</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
