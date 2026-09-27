@@ -94,17 +94,18 @@ self.addEventListener('fetch', (event) => {
 
     // Handle API requests with network-first strategy
     if (url.pathname.startsWith('/api/')) {
-        event.respondWith(networkFirstStrategy(request));
+        event.respondWith(networkFirstStrategy(event));
         return;
     }
 
     // Handle static assets with cache-first strategy
-    event.respondWith(cacheFirstStrategy(request));
+    event.respondWith(cacheFirstStrategy(event));
 });
 
 // Network-first strategy for API requests
 // Try network first, fall back to cache if offline
-async function networkFirstStrategy(request) {
+async function networkFirstStrategy(event) {
+    const { request } = event;
     const cache = await caches.open(API_CACHE);
 
     try {
@@ -112,8 +113,9 @@ async function networkFirstStrategy(request) {
 
         // Cache successful GET responses
         if (request.method === 'GET' && networkResponse.ok) {
-            // Clone the response since it can only be consumed once
-            cache.put(request, networkResponse.clone());
+            // Clone the response since it can only be consumed once.
+            // waitUntil keeps the worker alive until the write finishes.
+            event.waitUntil(cache.put(request, networkResponse.clone()));
         }
 
         return networkResponse;
@@ -149,14 +151,17 @@ async function networkFirstStrategy(request) {
 
 // Cache-first strategy for static assets
 // Serve from cache if available, otherwise fetch from network
-async function cacheFirstStrategy(request) {
+async function cacheFirstStrategy(event) {
+    const { request } = event;
     const cache = await caches.open(STATIC_CACHE);
 
     // Try cache first
     const cachedResponse = await cache.match(request);
     if (cachedResponse) {
-        // Return cached version but also update cache in background
-        updateCache(request, cache);
+        // Return cached version but also update cache in background.
+        // Without waitUntil the browser may stop the worker once the
+        // response is sent, killing the refresh partway.
+        event.waitUntil(updateCache(request, cache));
         return cachedResponse;
     }
 
@@ -166,7 +171,7 @@ async function cacheFirstStrategy(request) {
 
         // Cache successful responses
         if (networkResponse.ok) {
-            cache.put(request, networkResponse.clone());
+            event.waitUntil(cache.put(request, networkResponse.clone()));
         }
 
         return networkResponse;
@@ -188,7 +193,7 @@ async function updateCache(request, cache) {
     try {
         const networkResponse = await fetch(request);
         if (networkResponse.ok) {
-            cache.put(request, networkResponse);
+            await cache.put(request, networkResponse);
         }
     } catch (error) {
         // Silently fail - we already served from cache

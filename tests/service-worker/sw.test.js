@@ -31,11 +31,13 @@ const isNonGet = (request) =>
  * Minimal in-memory Cache mirroring the spec rules sw.js depends on:
  * match() never returns a hit for non-GET requests, put() rejects them,
  * and addAll() fetches every URL and fails as a whole if any fetch fails.
+ * Writes are dropped once the worker has been terminated.
  */
 class FakeCache {
-  constructor(fetchFn) {
+  constructor(fetchFn, isAlive) {
     this.entries = new Map();
     this.fetchFn = fetchFn;
+    this.isAlive = isAlive;
   }
 
   async match(request) {
@@ -45,6 +47,9 @@ class FakeCache {
 
   async put(request, response) {
     if (isNonGet(request)) throw new TypeError('Request method must be GET');
+    // Real writes are async; land on a later task so un-awaited puts are observable
+    await new Promise((r) => setTimeout(r, 0));
+    if (!this.isAlive()) return;
     this.entries.set(toUrl(request), response);
   }
 
@@ -60,13 +65,14 @@ class FakeCache {
 }
 
 class FakeCacheStorage {
-  constructor(fetchFn) {
+  constructor(fetchFn, isAlive = () => true) {
     this.caches = new Map();
     this.fetchFn = fetchFn;
+    this.isAlive = isAlive;
   }
 
   async open(name) {
-    if (!this.caches.has(name)) this.caches.set(name, new FakeCache(this.fetchFn));
+    if (!this.caches.has(name)) this.caches.set(name, new FakeCache(this.fetchFn, this.isAlive));
     return this.caches.get(name);
   }
 
@@ -94,8 +100,9 @@ class FakeCacheStorage {
  */
 function loadServiceWorker() {
   const listeners = {};
+  let alive = true;
   const fetch = vi.fn(async () => new Response('network', { status: 200 }));
-  const caches = new FakeCacheStorage((...args) => fetch(...args));
+  const caches = new FakeCacheStorage((...args) => fetch(...args), () => alive);
   const self = {
     addEventListener: (type, fn) => { listeners[type] = fn; },
     skipWaiting: vi.fn(async () => {}),
@@ -114,6 +121,10 @@ function loadServiceWorker() {
     await Promise.all(pending);
   };
 
+  // Promises extending the current fetch event's lifetime (respondWith + waitUntil)
+  let lifetime = [];
+  let lastFetchEvent = null;
+
   // Fetch event: returns the response passed to respondWith, or undefined if
   // the worker let the request fall through to the network
   const dispatchFetch = async (url, { method = 'GET', mode } = {}) => {
@@ -121,13 +132,36 @@ function loadServiceWorker() {
     // Request's constructor rejects mode: 'navigate', so set it directly
     if (mode) Object.defineProperty(request, 'mode', { value: mode });
     let responded;
-    listeners.fetch({ request, respondWith: (p) => { responded = p; } });
+    // Each event starts (or wakes) the worker
+    alive = true;
+    lifetime = [];
+    lastFetchEvent = {
+      request,
+      respondWith: (p) => { responded = p; lifetime.push(p); },
+      waitUntil: vi.fn((p) => { lifetime.push(p); }),
+    };
+    listeners.fetch(lastFetchEvent);
     return responded;
+  };
+
+  // Like a browser: once every lifetime promise has settled (including ones
+  // added while waiting), the worker may be stopped and later writes are lost
+  const terminateWhenIdle = async () => {
+    let count;
+    do {
+      count = lifetime.length;
+      await Promise.allSettled(lifetime);
+    } while (lifetime.length !== count);
+    alive = false;
   };
 
   const dispatchMessage = (data) => listeners.message({ data });
 
-  return { ...constants, self, caches, fetch, runLifecycle, dispatchFetch, dispatchMessage };
+  return {
+    ...constants, self, caches, fetch, runLifecycle, dispatchFetch, dispatchMessage,
+    terminateWhenIdle,
+    get lastFetchEvent() { return lastFetchEvent; },
+  };
 }
 
 describe('Service Worker', () => {
@@ -290,6 +324,9 @@ describe('Service Worker', () => {
       const response = await sw.dispatchFetch('/api/v1/states');
 
       expect(await response.json()).toEqual({ success: true, data: 'from network' });
+      // The cache write must extend the event's lifetime
+      expect(sw.lastFetchEvent.waitUntil).toHaveBeenCalled();
+      await sw.terminateWhenIdle();
       const apiCache = await sw.caches.open(sw.API_CACHE);
       expect(apiCache.has('/api/v1/states')).toBe(true);
     });
@@ -301,6 +338,7 @@ describe('Service Worker', () => {
 
       for (const state of ['CA', 'NY', 'TX']) {
         await sw.dispatchFetch(`/api/v1/states/${state}`);
+        await sw.terminateWhenIdle();
       }
 
       const apiCache = await sw.caches.open(sw.API_CACHE);
@@ -335,6 +373,7 @@ describe('Service Worker', () => {
     it('should fall back to the cached response, marked with X-SW-Cache, when the network fails', async () => {
       sw.fetch.mockResolvedValueOnce(Response.json({ data: 'from cache' }));
       await sw.dispatchFetch('/api/v1/states');
+      await sw.terminateWhenIdle();
 
       sw.fetch.mockRejectedValue(new TypeError('Failed to fetch'));
       const response = await sw.dispatchFetch('/api/v1/states');
@@ -371,15 +410,24 @@ describe('Service Worker', () => {
     it('should refresh the cached copy in the background (stale-while-revalidate)', async () => {
       const staticCache = await sw.caches.open(sw.STATIC_CACHE);
       await staticCache.put('/dist/app.min.js', new Response('old version'));
-      sw.fetch.mockResolvedValue(new Response('new version'));
+      let resolveNetwork;
+      sw.fetch.mockReturnValue(new Promise((r) => { resolveNetwork = r; }));
 
       const response = await sw.dispatchFetch('/dist/app.min.js');
       expect(await response.text()).toBe('old version');
 
-      await vi.waitFor(async () => {
-        const cached = await staticCache.match('/dist/app.min.js');
-        expect(await cached.text()).toBe('new version');
-      });
+      // The refresh is slower than the cached response. The worker must stay
+      // alive (via waitUntil) until it lands, or a browser may stop it first.
+      let idle = false;
+      const stopped = sw.terminateWhenIdle().then(() => { idle = true; });
+      await new Promise((r) => setTimeout(r, 0));
+      expect(idle).toBe(false);
+
+      resolveNetwork(new Response('new version'));
+      await stopped;
+
+      const cached = await staticCache.match('/dist/app.min.js');
+      expect(await cached.text()).toBe('new version');
     });
 
     it('should fetch and cache on a cache miss', async () => {
@@ -390,6 +438,9 @@ describe('Service Worker', () => {
       const response = await sw.dispatchFetch('/dist/enums.min.js');
 
       expect(await response.text()).toBe('fresh');
+      // The cache write must extend the event's lifetime
+      expect(sw.lastFetchEvent.waitUntil).toHaveBeenCalled();
+      await sw.terminateWhenIdle();
       const cached = await (await sw.caches.open(sw.STATIC_CACHE)).match('/dist/enums.min.js');
       expect(cached.headers.get('Content-Type')).toBe('application/javascript');
     });
