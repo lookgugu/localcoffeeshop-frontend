@@ -11,6 +11,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 describe('Service Worker', () => {
   let swRegistration;
@@ -451,26 +453,40 @@ describe('Service Worker', () => {
     });
 
     it('should not cache non-GET requests', async () => {
-      // This is a conceptual test - service workers typically only cache GET
-      const apiCache = await caches.open('coffee-shop-api-v3');
+      // Run the real sw.js fetch handler against stubbed globals
+      const swSource = readFileSync(resolve(__dirname, '../../public/sw.js'), 'utf8');
+      const listeners = {};
+      const fakeSelf = {
+        addEventListener: (type, fn) => { listeners[type] = fn; },
+        skipWaiting: vi.fn(),
+        clients: { claim: vi.fn() },
+      };
+      const put = vi.fn();
+      const fakeCaches = {
+        open: vi.fn(() => Promise.resolve({ put, match: vi.fn() })),
+      };
+      const fakeFetch = vi.fn(() => Promise.resolve(new Response('{}', { status: 200 })));
 
-      // Only GET requests are cacheable
-      const getRequest = new Request('/api/v1/states', { method: 'GET' });
-      const postRequest = new Request('/api/v1/states', { method: 'POST' });
-
-      // Cache GET request
-      await apiCache.put(
-        getRequest,
-        new Response(JSON.stringify({ data: 'cached' }))
+      new Function('self', 'caches', 'fetch', 'location', swSource)(
+        fakeSelf, fakeCaches, fakeFetch, { origin: 'http://localhost' }
       );
 
-      // POST requests would not be cached in real SW
-      const getResponse = await apiCache.match(getRequest);
-      expect(getResponse).toBeDefined();
+      const dispatchFetch = async (method) => {
+        let responsePromise;
+        listeners.fetch({
+          request: new Request('http://localhost/api/v1/states', { method }),
+          respondWith: (p) => { responsePromise = p; },
+        });
+        return responsePromise;
+      };
 
-      // POST would not be in cache
-      const postResponse = await apiCache.match(postRequest);
-      expect(postResponse).toBeUndefined();
+      await dispatchFetch('POST');
+      expect(fakeFetch).toHaveBeenCalledTimes(1);
+      expect(put).not.toHaveBeenCalled();
+
+      await dispatchFetch('GET');
+      expect(put).toHaveBeenCalledTimes(1);
+      expect(put.mock.calls[0][0].method).toBe('GET');
     });
 
     it('should cache state-specific API responses', async () => {
