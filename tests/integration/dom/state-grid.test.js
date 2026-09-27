@@ -458,8 +458,9 @@ describe('State Grid DOM Tests', () => {
   describe('API Integration', () => {
     it('should fetch states from API', async () => {
       const response = await fetch('/api/v1/states');
-      const data = await response.json();
+      const { success, data } = await response.json();
 
+      expect(success).toBe(true);
       expect(Array.isArray(data)).toBe(true);
       expect(data.length).toBeGreaterThan(0);
     });
@@ -485,7 +486,7 @@ describe('State Grid DOM Tests', () => {
 
     it('should validate state data from API', async () => {
       const response = await fetch('/api/v1/states');
-      const data = await response.json();
+      const { data } = await response.json();
 
       data.forEach(state => {
         expect(state).toHaveProperty('state');

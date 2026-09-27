@@ -425,10 +425,11 @@ describe('Filter Functionality DOM Tests', () => {
 
     it('should show all results when filters are cleared', async () => {
       const response = await fetch('/api/v1/search?state=&price=');
-      const data = await response.json();
+      const { success, data } = await response.json();
 
       // Should return unfiltered results
-      expect(Array.isArray(data.results)).toBe(true);
+      expect(success).toBe(true);
+      expect(Array.isArray(data)).toBe(true);
     });
   });
 
