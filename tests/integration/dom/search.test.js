@@ -8,6 +8,7 @@ import { http, HttpResponse } from 'msw';
 import { server } from '../../helpers/mockApi.js';
 import { input, click, keydown, waitForElement, waitForAsyncUpdates } from '../../helpers/dom.js';
 import { fixtureCoffeeShops, edgeCaseFixtures } from '../../helpers/fixtures.js';
+import api from '../../../public/api-client.js';
 
 // Load the shared enums and attach to window so the test's view helpers
 // (which mirror the browser's `window.CoffeeShopEnums` lookup) can find them.
@@ -88,6 +89,7 @@ describe('Search Functionality DOM Tests', () => {
     vi.clearAllTimers();
     vi.clearAllMocks();
     delete window.APP_CONFIG;
+    api._resetBaseUrl();
   });
 
   describe('Search Input', () => {
@@ -138,10 +140,8 @@ describe('Search Functionality DOM Tests', () => {
         http.get('*/api/v1/search', ({ request }) => {
           searchSpy(request.url);
           return HttpResponse.json({
-            results: [],
-            total: 0,
-            query: '',
-            filters: {}
+            success: true,
+            data: []
           });
         })
       );
@@ -194,7 +194,7 @@ describe('Search Functionality DOM Tests', () => {
       server.use(
         http.get('*/api/v1/search', () => {
           searchSpy();
-          return HttpResponse.json({ results: [], total: 0 });
+          return HttpResponse.json({ success: true, data: [] });
         })
       );
 
@@ -238,7 +238,7 @@ describe('Search Functionality DOM Tests', () => {
       server.use(
         http.get('*/api/v1/search', () => {
           searchSpy();
-          return HttpResponse.json({ results: [], total: 0 });
+          return HttpResponse.json({ success: true, data: [] });
         })
       );
 
@@ -282,19 +282,17 @@ describe('Search Functionality DOM Tests', () => {
           const url = new URL(request.url);
           capturedQuery = url.searchParams.get('q');
           return HttpResponse.json({
-            results: fixtureCoffeeShops.slice(0, 3),
-            total: 3,
-            query: capturedQuery,
-            filters: {}
+            success: true,
+            data: fixtureCoffeeShops.slice(0, 3)
           });
         })
       );
 
-      // Simulate search
-      const response = await fetch('/api/v1/search?q=coffee');
-      await response.json();
+      // Go through the production client, as searchCoffeeShops() does
+      const shops = await api.get('/search', { query: { q: 'coffee' } });
 
       expect(capturedQuery).toBe('coffee');
+      expect(shops).toEqual(fixtureCoffeeShops.slice(0, 3));
     });
 
     it('should handle empty search query', async () => {
@@ -305,10 +303,8 @@ describe('Search Functionality DOM Tests', () => {
           const url = new URL(request.url);
           capturedQuery = url.searchParams.get('q');
           return HttpResponse.json({
-            results: [],
-            total: 0,
-            query: '',
-            filters: {}
+            success: true,
+            data: []
           });
         })
       );
@@ -327,8 +323,8 @@ describe('Search Functionality DOM Tests', () => {
           const url = new URL(request.url);
           capturedQuery = url.searchParams.get('q');
           return HttpResponse.json({
-            results: [],
-            total: 0
+            success: true,
+            data: []
           });
         })
       );
