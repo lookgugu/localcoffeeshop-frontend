@@ -202,9 +202,8 @@ describe('Filter Functionality DOM Tests', () => {
           const url = new URL(request.url);
           capturedState = url.searchParams.get('state');
           return HttpResponse.json({
-            results: [],
-            total: 0,
-            filters: { state: capturedState }
+            success: true,
+            data: []
           });
         })
       );
@@ -223,9 +222,8 @@ describe('Filter Functionality DOM Tests', () => {
           const url = new URL(request.url);
           capturedPrice = url.searchParams.get('price');
           return HttpResponse.json({
-            results: [],
-            total: 0,
-            filters: { price: capturedPrice }
+            success: true,
+            data: []
           });
         })
       );
@@ -247,9 +245,8 @@ describe('Filter Functionality DOM Tests', () => {
             price: url.searchParams.get('price')
           };
           return HttpResponse.json({
-            results: [],
-            total: 0,
-            filters: capturedFilters
+            success: true,
+            data: []
           });
         })
       );
@@ -318,16 +315,18 @@ describe('Filter Functionality DOM Tests', () => {
           const filtered = fixtureCoffeeShops.filter(shop => shop.state === state);
 
           return HttpResponse.json({
-            results: filtered,
-            total: filtered.length
+            success: true,
+            data: filtered
           });
         })
       );
 
       const response = await fetch('/api/v1/search?state=CA');
-      const data = await response.json();
+      const { success, data } = await response.json();
 
-      expect(data.results.every(shop => shop.state === 'CA')).toBe(true);
+      expect(success).toBe(true);
+      expect(data.length).toBeGreaterThan(0);
+      expect(data.every(shop => shop.state === 'CA')).toBe(true);
     });
 
     it('should filter results by price only', async () => {
@@ -339,16 +338,18 @@ describe('Filter Functionality DOM Tests', () => {
           const filtered = fixtureCoffeeShops.filter(shop => shop.priceLevel === price);
 
           return HttpResponse.json({
-            results: filtered,
-            total: filtered.length
+            success: true,
+            data: filtered
           });
         })
       );
 
       const response = await fetch('/api/v1/search?price=PRICE_LEVEL_MODERATE');
-      const data = await response.json();
+      const { success, data } = await response.json();
 
-      expect(data.results.every(shop => shop.priceLevel === 'PRICE_LEVEL_MODERATE')).toBe(true);
+      expect(success).toBe(true);
+      expect(data.length).toBeGreaterThan(0);
+      expect(data.every(shop => shop.priceLevel === 'PRICE_LEVEL_MODERATE')).toBe(true);
     });
 
     it('should filter results by both state and price', async () => {
@@ -363,16 +364,18 @@ describe('Filter Functionality DOM Tests', () => {
           );
 
           return HttpResponse.json({
-            results: filtered,
-            total: filtered.length
+            success: true,
+            data: filtered
           });
         })
       );
 
       const response = await fetch('/api/v1/search?state=CA&price=PRICE_LEVEL_MODERATE');
-      const data = await response.json();
+      const { success, data } = await response.json();
 
-      expect(data.results.every(shop =>
+      expect(success).toBe(true);
+      expect(data.length).toBeGreaterThan(0);
+      expect(data.every(shop =>
         shop.state === 'CA' && shop.priceLevel === 'PRICE_LEVEL_MODERATE'
       )).toBe(true);
     });
@@ -443,7 +446,7 @@ describe('Filter Functionality DOM Tests', () => {
       server.use(
         http.get('*/api/v1/search', () => {
           searchSpy();
-          return HttpResponse.json({ results: [], total: 0 });
+          return HttpResponse.json({ success: true, data: [] });
         })
       );
 
@@ -474,7 +477,7 @@ describe('Filter Functionality DOM Tests', () => {
       server.use(
         http.get('*/api/v1/search', () => {
           searchSpy();
-          return HttpResponse.json({ results: [], total: 0 });
+          return HttpResponse.json({ success: true, data: [] });
         })
       );
 
