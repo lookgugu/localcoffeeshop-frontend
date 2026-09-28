@@ -1,3 +1,8 @@
+// @vitest-environment node
+//
+// Node's native Request/Response are used deliberately: happy-dom's Request
+// drops the `cache` option and resolves relative URLs against localhost:3000,
+// which would hide the HTTP-cache bypass sw.js relies on.
 /**
  * Service Worker Tests
  *
@@ -24,6 +29,14 @@ const REGISTRATION_SOURCE = readFileSync(resolve(PUBLIC_DIR, 'service-worker-reg
 
 const toUrl = (request) =>
   new URL(typeof request === 'string' ? request : request.url, ORIGIN).href;
+
+// In a real worker `new Request('/x')` resolves against the worker's scope;
+// Node's Request needs an absolute URL, so resolve against ORIGIN for it
+class WorkerRequest extends Request {
+  constructor(input, init) {
+    super(typeof input === 'string' ? new URL(input, ORIGIN).href : input, init);
+  }
+}
 const isNonGet = (request) =>
   typeof request !== 'string' && request.method && request.method !== 'GET';
 
@@ -54,7 +67,8 @@ class FakeCache {
   }
 
   async addAll(requests) {
-    const responses = await Promise.all(requests.map((r) => this.fetchFn(toUrl(r))));
+    // Pass Request objects through unchanged so tests can inspect cache mode
+    const responses = await Promise.all(requests.map((r) => this.fetchFn(r)));
     if (responses.some((r) => !r.ok)) throw new TypeError('addAll: bad response');
     requests.forEach((r, i) => this.entries.set(toUrl(r), responses[i]));
   }
@@ -110,9 +124,9 @@ function loadServiceWorker() {
   };
 
   const constants = new Function(
-    'self', 'caches', 'fetch', 'location',
+    'self', 'caches', 'fetch', 'location', 'Request',
     `${SW_SOURCE}\nreturn { STATIC_CACHE, API_CACHE, STATIC_ASSETS };`
-  )(self, caches, fetch, { origin: ORIGIN });
+  )(self, caches, fetch, { origin: ORIGIN }, WorkerRequest);
 
   // Lifecycle events: resolve once everything passed to waitUntil settles
   const runLifecycle = async (type) => {
@@ -249,6 +263,18 @@ describe('Service Worker', () => {
       expect(sw.self.skipWaiting).toHaveBeenCalled();
     });
 
+    it('should bypass the HTTP cache when precaching', async () => {
+      await sw.runLifecycle('install');
+
+      // /dist/* is served immutable without hashed names; a plain fetch
+      // would precache whatever stale copy the browser already holds
+      expect(sw.fetch).toHaveBeenCalledTimes(sw.STATIC_ASSETS.length);
+      for (const [request] of sw.fetch.mock.calls) {
+        expect(request, `${request.url} cache mode`).toBeInstanceOf(Request);
+        expect(request.cache).toBe('reload');
+      }
+    });
+
     it('should only precache files that exist in public/', () => {
       const missing = sw.STATIC_ASSETS
         .filter((asset) => asset !== '/')
@@ -266,12 +292,14 @@ describe('Service Worker', () => {
       ]));
     });
 
-    it('should log and not skip waiting when precaching fails', async () => {
-      sw.fetch.mockImplementation(async (url) =>
-        new Response('', { status: url.endsWith('/dist/app.min.js') ? 404 : 200 })
+    it('should fail install when precaching fails, so the old worker stays in control', async () => {
+      sw.fetch.mockImplementation(async (request) =>
+        new Response('', { status: request.url.endsWith('/dist/app.min.js') ? 404 : 200 })
       );
 
-      await expect(sw.runLifecycle('install')).resolves.toBeUndefined();
+      // A rejected waitUntil aborts the install; swallowing it would activate
+      // a worker with a partial cache and then delete the old complete one
+      await expect(sw.runLifecycle('install')).rejects.toThrow();
 
       expect(console.error).toHaveBeenCalledWith(
         '[SW] Failed to cache static assets:', expect.any(Error)
@@ -314,6 +342,29 @@ describe('Service Worker', () => {
 
       expect(response).toBeUndefined();
       expect(sw.fetch).not.toHaveBeenCalled();
+    });
+
+    it('should not intercept the production API, which is cross-origin', async () => {
+      // netlify.toml sets API_BASE_URL to https://api.localcoffeeshop.co, so
+      // in production the network-first branch below never runs. The API
+      // tests use a same-origin URL to exercise it as it behaves in local dev.
+      const response = await sw.dispatchFetch('https://api.localcoffeeshop.co/api/v1/states');
+
+      expect(response).toBeUndefined();
+      expect(sw.fetch).not.toHaveBeenCalled();
+    });
+
+    it('should pass non-GET static requests straight to the network', async () => {
+      const staticCache = await sw.caches.open(sw.STATIC_CACHE);
+      const put = vi.spyOn(staticCache, 'put');
+      sw.fetch.mockResolvedValue(new Response('created', { status: 201 }));
+
+      const response = await sw.dispatchFetch('/html/submit.html', { method: 'POST' });
+      await sw.terminateWhenIdle();
+
+      expect(response.status).toBe(201);
+      // Cache API rejects non-GET puts; the worker must not attempt one
+      expect(put).not.toHaveBeenCalled();
     });
   });
 
@@ -430,6 +481,19 @@ describe('Service Worker', () => {
       expect(await cached.text()).toBe('new version');
     });
 
+    it('should revalidate against the server, not the browser HTTP cache', async () => {
+      const staticCache = await sw.caches.open(sw.STATIC_CACHE);
+      await staticCache.put('/dist/app.min.js', new Response('old version'));
+
+      await sw.dispatchFetch('/dist/app.min.js');
+      await sw.terminateWhenIdle();
+
+      // /dist/* is immutable for a year in netlify.toml; a default-mode fetch
+      // would be answered from the HTTP cache and never see a new deploy
+      expect(sw.fetch).toHaveBeenCalledTimes(1);
+      expect(sw.fetch.mock.calls[0][1]).toEqual({ cache: 'no-cache' });
+    });
+
     it('should fetch and cache on a cache miss', async () => {
       sw.fetch.mockResolvedValue(new Response('fresh', {
         headers: { 'Content-Type': 'application/javascript' },
@@ -474,6 +538,17 @@ describe('Service Worker', () => {
       const response = await sw.dispatchFetch('/html/state.html?code=CA', { mode: 'navigate' });
 
       expect(await response.text()).toBe('<html>Home</html>');
+    });
+
+    it('should return 503 for offline navigations when the homepage is not cached', async () => {
+      sw.fetch.mockRejectedValue(new TypeError('Failed to fetch'));
+
+      const response = await sw.dispatchFetch('/html/state.html?code=CA', { mode: 'navigate' });
+
+      // Previously caches.match('/') resolved undefined and respondWith(undefined)
+      // produced a browser network-error page
+      expect(response).toBeInstanceOf(Response);
+      expect(response.status).toBe(503);
     });
 
     it('should return 503 for uncached non-navigation requests when offline', async () => {
