@@ -36,11 +36,6 @@ static_sites:
         value: https://api.localcoffeeshop.co/api/v1
         scope: BUILD_TIME
 
-      - key: GA_MEASUREMENT_ID
-        value: G-YVSXN7PM48
-        scope: BUILD_TIME
-        type: SECRET
-
     # Routes - SPA-like behavior
     routes:
       - path: /

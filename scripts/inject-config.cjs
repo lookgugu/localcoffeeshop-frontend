@@ -15,14 +15,12 @@ if (fs.existsSync(envPath)) {
 }
 
 const API_BASE_URL = process.env.API_BASE_URL || '/api/v1';
-const GA_MEASUREMENT_ID = process.env.GA_MEASUREMENT_ID || '';
 const ENVIRONMENT = process.env.NODE_ENV || 'production';
 
 const configContent = `// Auto-generated configuration - DO NOT EDIT MANUALLY
 // Generated at: ${new Date().toISOString()}
 window.APP_CONFIG = {
     API_BASE_URL: '${API_BASE_URL}',
-    GA_MEASUREMENT_ID: '${GA_MEASUREMENT_ID}',
     ENVIRONMENT: '${ENVIRONMENT}'
 };
 `;

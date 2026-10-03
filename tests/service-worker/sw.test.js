@@ -283,13 +283,17 @@ describe('Service Worker', () => {
       expect(missing).toEqual([]);
     });
 
-    it('should precache JS bundles, CSS, analytics and consent files', () => {
+    it('should precache JS bundles, CSS and consent files', () => {
       expect(sw.STATIC_ASSETS).toEqual(expect.arrayContaining([
         '/dist/app.min.js',
         '/dist/styles.min.css',
-        '/analytics.js',
+        '/geo-consent-default.js',
         '/consent-banner.js',
       ]));
+    });
+
+    it('should not precache the removed config-driven analytics.js (#17)', () => {
+      expect(sw.STATIC_ASSETS).not.toContain('/analytics.js');
     });
 
     it('should fail install when precaching fails, so the old worker stays in control', async () => {

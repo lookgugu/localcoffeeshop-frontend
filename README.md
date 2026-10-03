@@ -37,7 +37,6 @@ cp .env.example .env
 
 Required environment variables:
 - `API_BASE_URL` - Backend API URL (e.g., `https://api.localcoffeeshop.co/api/v1`)
-- `GA_MEASUREMENT_ID` - Google Analytics measurement ID
 - `NODE_ENV` - Environment (development or production)
 
 ### Running Locally
@@ -73,8 +72,7 @@ public/
 ├── config.js       # Generated at build time (do not edit)
 ├── constants.js    # State names and price levels
 ├── frontend.js     # Main application logic
-├── sw.js           # Service worker for offline support
-└── analytics.js    # Google Analytics integration
+└── sw.js           # Service worker for offline support
 ```
 
 ## Features
@@ -106,12 +104,13 @@ The app uses a generated `config.js` file for runtime configuration:
 ```javascript
 window.APP_CONFIG = {
     API_BASE_URL: 'https://api.localcoffeeshop.co/api/v1',
-    GA_MEASUREMENT_ID: 'G-YVSXN7PM48',
     ENVIRONMENT: 'production'
 };
 ```
 
 This file is **auto-generated** during the build process. Do not edit it manually.
+
+Google Analytics is not configured through `config.js` or environment variables: each HTML page loads it via the static gtag snippet (`G-YVSXN7PM48`) in its `<head>`, alongside the consent-mode scripts (`geo-consent-default.js`, `consent-banner.js`).
 
 ## Development
 
@@ -145,7 +144,6 @@ The app is configured for Netlify deployment via `netlify.toml`.
 
 **Environment Variables (set in Netlify dashboard):**
 - `API_BASE_URL`: `https://api.localcoffeeshop.co/api/v1`
-- `GA_MEASUREMENT_ID`: Your Google Analytics ID
 - `NODE_ENV`: `production`
 
 **Deploy:**
