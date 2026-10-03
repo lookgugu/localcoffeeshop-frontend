@@ -25,9 +25,7 @@ const PUBLIC = join(ROOT, 'public');
 
 // Links known to be broken, each tracked by an issue. The test also fails if
 // one of these starts resolving, so the entry gets removed when it's fixed.
-const KNOWN_BROKEN = {
-  '/pages/privacy.html': '#18 (privacy policy page not written yet)',
-};
+const KNOWN_BROKEN = {};
 
 // Build outputs that aren't committed: npm run build copies public/html/*.html
 // to the site root, and the prerender step writes /pages/states/.
