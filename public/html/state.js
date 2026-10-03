@@ -23,19 +23,37 @@ const { createSkeletonItem } = window.CoffeeShopSkeleton;
 const api = window.ApiClient;
 const { createStore } = window.CoffeeShopStore;
 
-// Per-page store (ADR-0001): three keys cover all the state-detail view's
-// reactive surface.
-//   - shops:   the list rendered into <ul id="coffeeList"> (null = unloaded)
-//   - loading: skeleton-loading toggle
-//   - error:   user-facing error message (null when no error)
+// Shops requested per API page. The API defaults to 100 and caps at 500.
+// We load one page up front and fetch further pages on demand ("Load more"):
+// the largest state has ~2,560 shops, and the prerendered static page already
+// lists every shop for crawlers and no-JS visitors.
+const PAGE_SIZE = 100;
+
+// Per-page store (ADR-0001): the state-detail view's reactive surface.
+//   - shops:         the loaded shops rendered into <ul id="coffeeList"> (null = unloaded)
+//   - pagination:    { page, total, hasNext, rejected } for what has been loaded
+//                    (null = unloaded). `total` is the displayed total: the
+//                    server count minus `rejected` (duplicates skipped across
+//                    pages), or exactly the loaded count once there are no more pages.
+//   - loading:       skeleton-loading toggle (first page)
+//   - loadingMore:   a "Load more" request is in flight
+//   - error:         user-facing error message for the first page (null when no error)
+//   - loadMoreError: user-facing error for a failed "Load more" (null when none)
 //
 // `shops` starts as null (not []) so that a successful empty-result load
 // still notifies subscribers (null → [] is a real change; [] → [] is not).
 const store = createStore({
     shops: null,
+    pagination: null,
     loading: false,
-    error: null
+    loadingMore: false,
+    error: null,
+    loadMoreError: null
 });
+
+// shop object -> its rendered <li>, rebuilt on each render; used to move focus
+// to the first newly loaded shop after "Load more".
+let shopElements = new Map();
 
 /**
  * Display an error message in the coffee list
@@ -178,8 +196,33 @@ async function loadBackendConfig() {
 // Each renderer reads only the key it subscribes to.
 // ============================================================================
 
+/** Format a count for display: 1240 -> "1,240". */
+function formatCount(n) {
+    return Number(n).toLocaleString('en-US');
+}
+
 /**
- * Render the shops list + the summary stats (total + avg price).
+ * Render the summary stats: the state's real total (from API pagination
+ * metadata) and the average price level. The average can only be computed
+ * over shops we have loaded, so when that is a subset it says so.
+ * Triggered by store.subscribe('shops' | 'pagination', renderSummary).
+ */
+function renderSummary() {
+    const shops = store.get('shops');
+    const pagination = store.get('pagination');
+    if (shops == null || pagination == null) return;
+
+    const total = Math.max(pagination.total, shops.length);
+    document.getElementById('totalShops').textContent = formatCount(total);
+
+    const avg = Price.average(shops.map(s => Price.fromKey(s.priceLevel))).label;
+    document.getElementById('avgPrice').textContent = shops.length < total
+        ? `${avg} (based on the ${formatCount(shops.length)} shops loaded so far)`
+        : avg;
+}
+
+/**
+ * Render the shops list.
  * Triggered by store.subscribe('shops', renderShops). `shops` is null
  * before the first successful load.
  */
@@ -187,12 +230,9 @@ function renderShops(shops) {
     if (shops == null) return;
 
     const coffeeList = document.getElementById('coffeeList');
-    const totalShops = document.getElementById('totalShops');
-    const avgPrice = document.getElementById('avgPrice');
 
     coffeeList.textContent = '';
-    totalShops.textContent = shops.length;
-    avgPrice.textContent = Price.average(shops.map(s => Price.fromKey(s.priceLevel))).label;
+    shopElements = new Map();
 
     if (shops.length === 0) {
         // Empty-after-load is a UX concern, not an error — but the existing
@@ -233,6 +273,7 @@ function renderShops(shops) {
             li.appendChild(span);
         }
 
+        shopElements.set(shop, li);
         fragment.appendChild(li);
     });
     coffeeList.appendChild(fragment);
@@ -264,29 +305,223 @@ function showOrHideError(message) {
     // renderShops, which clears any prior error <li>.
 }
 
+/**
+ * Get (creating on first use) the "Load more" controls that sit after the
+ * list: a polite live region with the "Showing X of Y" count, an alert for
+ * load-more failures, and the button itself. Built in JS so the page markup
+ * doesn't need to change.
+ */
+function getLoadMoreControls() {
+    let container = document.getElementById('loadMoreControls');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'loadMoreControls';
+        container.className = 'load-more-controls';
+        container.hidden = true;
+
+        const status = document.createElement('p');
+        status.id = 'shopListStatus';
+        status.className = 'result-count';
+        status.setAttribute('role', 'status');
+        status.setAttribute('aria-live', 'polite');
+        container.appendChild(status);
+
+        const errorMsg = document.createElement('p');
+        errorMsg.id = 'loadMoreError';
+        errorMsg.className = 'error';
+        errorMsg.setAttribute('role', 'alert');
+        errorMsg.hidden = true;
+        container.appendChild(errorMsg);
+
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.id = 'loadMoreShops';
+        button.className = 'load-more';
+        button.setAttribute('aria-controls', 'coffeeList');
+        button.addEventListener('click', () => {
+            loadMoreShops().catch(err => console.error('Error loading more coffee shops:', err));
+        });
+        container.appendChild(button);
+
+        document.getElementById('coffeeList').after(container);
+    }
+    return {
+        container,
+        status: container.querySelector('#shopListStatus'),
+        errorMsg: container.querySelector('#loadMoreError'),
+        button: container.querySelector('#loadMoreShops')
+    };
+}
+
+/**
+ * Render the "Showing X of Y" status and the "Load more" button.
+ * Triggered by store.subscribe('shops' | 'pagination' | 'loadingMore' |
+ * 'loadMoreError', renderLoadMore).
+ */
+function renderLoadMore() {
+    const shops = store.get('shops');
+    const pagination = store.get('pagination');
+    const loadingMore = store.get('loadingMore');
+    const loadMoreError = store.get('loadMoreError');
+
+    const multiPage = shops != null && pagination != null && shops.length > 0
+        && (pagination.hasNext || pagination.page > 1);
+    const existing = document.getElementById('loadMoreControls');
+    if (!multiPage) {
+        if (existing) existing.hidden = true;
+        return;
+    }
+
+    const { container, status, errorMsg, button } = getLoadMoreControls();
+    container.hidden = false;
+
+    const total = Math.max(pagination.total, shops.length);
+    status.textContent = pagination.hasNext
+        ? `Showing ${formatCount(shops.length)} of ${formatCount(total)} coffee shops`
+        : `Showing all ${formatCount(shops.length)} coffee shops`;
+
+    errorMsg.hidden = !loadMoreError;
+    errorMsg.textContent = loadMoreError || '';
+
+    document.getElementById('coffeeList').setAttribute('aria-busy', loadingMore ? 'true' : 'false');
+
+    if (!pagination.hasNext) {
+        button.hidden = true;
+        return;
+    }
+    const remaining = Math.max(total - shops.length, 0);
+    const nextBatch = Math.min(PAGE_SIZE, remaining);
+    button.hidden = false;
+    button.disabled = loadingMore;
+    if (loadingMore) {
+        button.textContent = 'Loading more coffee shops...';
+        button.setAttribute('aria-label', 'Loading more coffee shops');
+    } else {
+        button.textContent = `Load more (${formatCount(remaining)} remaining)`;
+        button.setAttribute('aria-label', `Load ${formatCount(nextBatch)} more coffee shops, ${formatCount(remaining)} remaining`);
+    }
+}
+
 // Wire subscribers — see ADR-0001 for the rationale on explicit per-key subscriptions.
 store.subscribe('shops', renderShops);
+store.subscribe('shops', renderSummary);
+store.subscribe('pagination', renderSummary);
+store.subscribe('shops', renderLoadMore);
+store.subscribe('pagination', renderLoadMore);
+store.subscribe('loadingMore', renderLoadMore);
+store.subscribe('loadMoreError', renderLoadMore);
 store.subscribe('loading', toggleSkeletonLoading);
 store.subscribe('error', showOrHideError);
 
+// State code of the loaded list; "Load more" fetches further pages of it.
+let currentStateCode = null;
+
 /**
- * Fetch coffee shops for `stateCode`, pushing results into the store.
- * Renderers react via subscribers.
+ * Fetch one page of a state's shops. Returns the shops and normalised
+ * pagination. When the API omits pagination metadata, the page is treated
+ * as the whole list.
+ */
+async function fetchShopsPage(stateCode, page) {
+    const result = await api.get(`/states/${stateCode}`, {
+        query: { page, limit: PAGE_SIZE },
+        withMeta: true
+    });
+    // An older cached ApiClient (pre-withMeta) returns the bare array; treat
+    // that as a single page with no pagination metadata.
+    const { data, metadata } = Array.isArray(result)
+        ? { data: result, metadata: null }
+        : (result || {});
+    if (!Array.isArray(data)) {
+        throw new Error('Invalid data format received from API');
+    }
+    const p = metadata && metadata.pagination;
+    const pagination = p && typeof p.total === 'number'
+        ? { page: p.page || page, total: p.total, hasNext: Boolean(p.hasNext) }
+        : { page, total: data.length, hasNext: false };
+    return { shops: data, pagination };
+}
+
+/**
+ * Total to display. The server's count includes records we skip as
+ * duplicates across pages, so subtract those; once there are no more pages
+ * the total is exactly what was loaded, so the final state never shows a
+ * phantom remainder.
+ */
+function reconcileTotal(serverTotal, rejected, loaded, hasNext) {
+    if (!hasNext) return loaded;
+    return Math.max(serverTotal - rejected, loaded);
+}
+
+/**
+ * Fetch the first page of coffee shops for `stateCode`, pushing results into
+ * the store. Renderers react via subscribers.
  */
 async function loadStateShops(stateCode) {
+    currentStateCode = stateCode;
     store.set('loading', true);
     store.set('error', null);
+    store.set('loadMoreError', null);
     try {
-        const data = await api.get(`/states/${stateCode}`);
-        if (!Array.isArray(data)) {
-            throw new Error('Invalid data format received from API');
-        }
-        store.set('shops', data);
+        const { shops, pagination } = await fetchShopsPage(stateCode, 1);
+        // Clear loading before rendering: renderShops only shows the empty
+        // state once loading is over.
+        store.set('loading', false);
+        // Pagination first: renderSummary/renderLoadMore run on each write and
+        // need both keys; the 'shops' write is the one that renders the list.
+        store.set('pagination', {
+            ...pagination,
+            total: reconcileTotal(pagination.total, 0, shops.length, pagination.hasNext),
+            rejected: 0
+        });
+        store.set('shops', shops);
     } catch (err) {
         console.error('Error loading coffee shops:', err);
         store.set('error', 'Error loading coffee shops. Please try again later.');
     } finally {
         store.set('loading', false);
+    }
+}
+
+/**
+ * Fetch the next page and append it to the loaded shops. On failure the
+ * already-loaded shops stay and the button stays available to retry.
+ */
+async function loadMoreShops() {
+    const pagination = store.get('pagination');
+    if (store.get('loadingMore') || !pagination || !pagination.hasNext || !currentStateCode) return;
+
+    store.set('loadMoreError', null);
+    store.set('loadingMore', true);
+    try {
+        const next = await fetchShopsPage(currentStateCode, pagination.page + 1);
+        // Skip shops already loaded (data can shift between page requests).
+        const loaded = store.get('shops') || [];
+        const seen = new Set(loaded.map(s => s.id).filter(id => id != null));
+        const fresh = next.shops.filter(s => s.id == null || !seen.has(s.id));
+        // Duplicates were counted in the server total but won't be shown.
+        const rejected = (pagination.rejected || 0) + (next.shops.length - fresh.length);
+        const hasNext = next.pagination.hasNext && next.shops.length > 0;
+
+        store.set('pagination', {
+            ...next.pagination,
+            hasNext,
+            rejected,
+            total: reconcileTotal(next.pagination.total, rejected, loaded.length + fresh.length, hasNext)
+        });
+        store.update('shops', prev => (prev || []).concat(fresh));
+
+        // Move focus to the first newly loaded shop so keyboard and screen
+        // reader users continue from where the new content starts.
+        const firstNew = fresh.length ? shopElements.get(fresh[0]) : null;
+        if (firstNew) {
+            firstNew.setAttribute('tabindex', '-1');
+            firstNew.focus();
+        }
+    } catch (err) {
+        console.error('Error loading more coffee shops:', err);
+        store.set('loadMoreError', 'Could not load more coffee shops. Please try again.');
+    } finally {
+        store.set('loadingMore', false);
     }
 }
 

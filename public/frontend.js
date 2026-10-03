@@ -34,8 +34,15 @@
         SEARCH_DEBOUNCE_MS: 300,
 
         // Pagination
+        // Shops revealed per render/"Load More" click (client-side batches).
         SEARCH_RESULTS_PER_PAGE: 50,
         LOAD_MORE_BATCH_SIZE: 50,
+        // Shops requested per /search API page (API default 100, max 500).
+        // "Load More" reveals already-fetched shops first and only requests
+        // the next API page once those run out.
+        SEARCH_API_PAGE_SIZE: 100,
+        // Pages to skip past when a whole API page fails validation.
+        MAX_SKIPPED_PAGES: 3,
 
         // Network Settings
         INIT_TIMEOUT_MS: 30000   // 30 second timeout for full initialization
@@ -48,12 +55,32 @@
     // The store owns what the rest of the app reacts to. Renderers
     // subscribe per-key; mutations go through store.update / store.set.
     //   - availableStates: index of state codes/counts shown on the grid
-    //   - lastSearchResults: most recent search result list (for re-renders)
-    //   - loadMoreState: pagination cursor for the search-results list
+    //   - lastSearchResults: most recent search result, null before the first
+    //     search: { shops, total, page, hasNext, rejected, query } where
+    //     `shops` is the first API page (valid shops only), `total`/`hasNext`
+    //     come from the API's pagination metadata, `rejected` counts invalid
+    //     records dropped from the page and `query` is the search that
+    //     produced it.
+    //   - loadMoreState: pagination cursor for the search-results list:
+    //     every shop fetched so far, how many are rendered, and the API
+    //     cursor (page, hasNext, total, query) plus an in-flight flag.
+    //     `total` is the displayed total: the server count minus `rejected`
+    //     (invalid + duplicate records), or exactly the loaded count once
+    //     there are no more pages.
+    const EMPTY_LOAD_MORE_STATE = Object.freeze({
+        shops: [],
+        currentlyShowing: 0,
+        total: 0,
+        rejected: 0,
+        page: 0,
+        hasNext: false,
+        query: null,
+        loading: false
+    });
     const store = createStore({
         availableStates: [],
         lastSearchResults: null,
-        loadMoreState: { shops: [], currentlyShowing: 0 }
+        loadMoreState: EMPTY_LOAD_MORE_STATE
     });
 
     // Rendering concerns — local to the view layer, NOT in the store.
@@ -63,6 +90,11 @@
     let searchTimeout = null;   // debounce timer for the search input
     let resizeTimeout = null;   // debounce timer for window resize
     let gridColumns = null;     // cached column count for keyboard nav
+    // Request-generation token for search: bumped whenever a new search (or
+    // "near me" lookup) starts. Every async search request captures it and
+    // drops its response if it changed, so a slow response for an old search
+    // can never render into a newer one.
+    let searchGeneration = 0;
     const resultsElements = []; // DOM nodes accumulated during render
     const dom = {               // cached element references
         searchResultsContainer: null,
@@ -299,12 +331,20 @@
         return item;
     }
 
-    function displayResults(shops) {
-        if (!dom.searchResultsContainer) return;
+    /**
+     * Render a fresh search result. `results` is the lastSearchResults value:
+     * { shops, total, page, hasNext, query }. Renders the first client-side
+     * batch; the count line and "Load More" button are drawn by
+     * renderSearchPagination from loadMoreState.
+     */
+    function displayResults(results) {
+        if (!dom.searchResultsContainer || results == null) return;
+        const { shops, total, page, hasNext, query } = results;
+        const rejected = results.rejected || 0;
 
         dom.searchResultsContainer.replaceChildren();
         resultsElements.length = 0;
-        store.set('loadMoreState', { shops: [], currentlyShowing: 0 });
+        store.set('loadMoreState', EMPTY_LOAD_MORE_STATE);
 
         const header = document.createElement('h2');
         header.textContent = 'Search Results';
@@ -318,15 +358,15 @@
             return;
         }
 
+        // Polite live region: "Showing X of Y" updates are announced as more load.
         const resultCount = document.createElement('p');
         resultCount.className = 'result-count';
-        resultCount.textContent = `${shops.length} found`;
+        resultCount.setAttribute('role', 'status');
+        resultCount.setAttribute('aria-live', 'polite');
         dom.searchResultsContainer.appendChild(resultCount);
 
         const fragment = document.createDocumentFragment();
-        const shopsToRender = shops.length > CONSTANTS.SEARCH_RESULTS_PER_PAGE
-            ? shops.slice(0, CONSTANTS.SEARCH_RESULTS_PER_PAGE)
-            : shops;
+        const shopsToRender = shops.slice(0, CONSTANTS.SEARCH_RESULTS_PER_PAGE);
 
         shopsToRender.forEach(shop => {
             const item = createShopElement(shop);
@@ -336,39 +376,148 @@
 
         dom.searchResultsContainer.appendChild(fragment);
 
-        if (shops.length > CONSTANTS.SEARCH_RESULTS_PER_PAGE) {
-            // Persist pagination cursor for the Load More handler.
-            store.set('loadMoreState', {
-                shops,
-                currentlyShowing: CONSTANTS.SEARCH_RESULTS_PER_PAGE
-            });
-
-            const loadMoreButton = document.createElement('button');
-            loadMoreButton.className = 'load-more';
-            loadMoreButton.textContent = `Load More (${shops.length - CONSTANTS.SEARCH_RESULTS_PER_PAGE} remaining)`;
-            loadMoreButton.setAttribute('aria-label', `Load ${shops.length - CONSTANTS.SEARCH_RESULTS_PER_PAGE} more results`);
-            // No individual click handler - uses event delegation
-            dom.searchResultsContainer.appendChild(loadMoreButton);
-        }
+        // Persist the pagination cursor; renderSearchPagination draws the
+        // count line and (if anything is left) the Load More button.
+        store.set('loadMoreState', {
+            shops,
+            currentlyShowing: shopsToRender.length,
+            total: reconcileTotal(total, rejected, shops.length, hasNext),
+            rejected,
+            page,
+            hasNext,
+            query,
+            loading: false
+        });
 
         // Move focus to results for screen reader users
         dom.searchResultsContainer.setAttribute('tabindex', '-1');
         dom.searchResultsContainer.focus();
     }
 
-    function loadMoreResults() {
-        const { shops, currentlyShowing } = store.get('loadMoreState');
-        if (!shops.length || currentlyShowing >= shops.length) return;
+    /**
+     * Total to display for a result set. The server's count includes records
+     * we drop (invalid shape, duplicates across pages), so subtract those; and
+     * once there are no more pages the total is exactly what was loaded, so
+     * the final state never shows a phantom remainder.
+     */
+    function reconcileTotal(serverTotal, rejected, loaded, hasNext) {
+        if (!hasNext) return loaded;
+        return Math.max(serverTotal - rejected, loaded);
+    }
 
+    /** Format a count for display: 2560 -> "2,560". */
+    function formatCount(n) {
+        return Number(n).toLocaleString('en-US');
+    }
+
+    /**
+     * Draw the result-count line ("Showing X of Y" / "N found") and the Load
+     * More button from the pagination cursor.
+     * Triggered by store.subscribe('loadMoreState', renderSearchPagination).
+     */
+    function renderSearchPagination(state) {
+        const container = dom.searchResultsContainer;
+        if (!container || !state.shops.length) return;
+
+        const { currentlyShowing, total, hasNext, loading } = state;
+
+        const resultCount = container.querySelector('.result-count');
+        if (resultCount) {
+            resultCount.textContent = currentlyShowing < total
+                ? `Showing ${formatCount(currentlyShowing)} of ${formatCount(total)}`
+                : `${formatCount(total)} found`;
+        }
+
+        let loadMoreButton = container.querySelector('.load-more');
+        const hasMore = currentlyShowing < state.shops.length || hasNext;
+        if (!hasMore) {
+            if (loadMoreButton) loadMoreButton.remove();
+            return;
+        }
+
+        if (!loadMoreButton) {
+            loadMoreButton = document.createElement('button');
+            loadMoreButton.type = 'button';
+            loadMoreButton.className = 'load-more';
+            // No individual click handler - uses event delegation
+            container.appendChild(loadMoreButton);
+        }
+
+        const remaining = Math.max(total - currentlyShowing, state.shops.length - currentlyShowing, 0);
+        const nextBatch = Math.min(CONSTANTS.LOAD_MORE_BATCH_SIZE, remaining);
+        loadMoreButton.disabled = loading;
+        if (loading) {
+            loadMoreButton.textContent = 'Loading...';
+            loadMoreButton.setAttribute('aria-label', 'Loading more results');
+        } else {
+            loadMoreButton.textContent = `Load More (${formatCount(remaining)} remaining)`;
+            loadMoreButton.setAttribute('aria-label', `Load ${formatCount(nextBatch)} more results, ${formatCount(remaining)} remaining`);
+        }
+    }
+
+    /**
+     * "Load More": reveal the next client-side batch. When every fetched shop
+     * is already shown and the API has more pages, fetch the next page first.
+     */
+    async function loadMoreResults() {
+        let state = store.get('loadMoreState');
+        if (!state.shops.length || state.loading) return;
+
+        if (state.currentlyShowing >= state.shops.length) {
+            if (!state.hasNext) return;
+            const query = state.query;
+            const generation = searchGeneration;
+            // Superseded if a newer search started (generation bumped) or the
+            // cursor now belongs to different results.
+            const isStale = () => generation !== searchGeneration
+                || store.get('loadMoreState').query !== query;
+            store.update('loadMoreState', prev => ({ ...prev, loading: true }));
+            let next;
+            try {
+                next = await fetchSearchPages(query, state.page + 1);
+            } catch (error) {
+                // A newer search replaced these results; drop the stale outcome.
+                if (isStale()) return;
+                handleError(error, 'loadMoreResults');
+                store.update('loadMoreState', prev => ({ ...prev, loading: false }));
+                showUserError('Failed to load more coffee shops. Please try again.');
+                return;
+            }
+            if (isStale()) return;
+            store.update('loadMoreState', prev => {
+                // Skip shops already fetched (data can shift between page requests).
+                const seen = new Set(prev.shops.map(s => s.id).filter(id => id != null));
+                const fresh = next.shops.filter(s => s.id == null || !seen.has(s.id));
+                const shops = prev.shops.concat(fresh);
+                // Records the server counted but we won't show: invalid ones
+                // (dropped in fetchSearchPage) plus duplicates skipped here.
+                const rejected = prev.rejected + next.rejected + (next.shops.length - fresh.length);
+                // An empty page can't make progress; stop offering more.
+                const hasMorePages = next.hasNext && (next.shops.length + next.rejected) > 0;
+                return {
+                    ...prev,
+                    shops,
+                    page: next.page,
+                    hasNext: hasMorePages,
+                    total: reconcileTotal(next.total, rejected, shops.length, hasMorePages),
+                    rejected,
+                    loading: false
+                };
+            });
+            state = store.get('loadMoreState');
+            if (state.currentlyShowing >= state.shops.length) return;
+        }
+
+        const { shops, currentlyShowing } = state;
         const nextBatch = Math.min(currentlyShowing + CONSTANTS.LOAD_MORE_BATCH_SIZE, shops.length);
         const additionalShops = shops.slice(currentlyShowing, nextBatch);
 
         const fragment = document.createDocumentFragment();
-
-        additionalShops.forEach(shop => {
+        const newItems = additionalShops.map(shop => {
             const item = createShopElement(shop);
             resultsElements.push(item);
             fragment.appendChild(item);
+            return item;
         });
 
         const loadMoreButton = dom.searchResultsContainer.querySelector('.load-more');
@@ -377,12 +526,10 @@
         // Advance the pagination cursor (new object reference → subscribers notified).
         store.update('loadMoreState', prev => ({ ...prev, currentlyShowing: nextBatch }));
 
-        if (nextBatch < shops.length) {
-            loadMoreButton.textContent = `Load More (${shops.length - nextBatch} remaining)`;
-            loadMoreButton.setAttribute('aria-label', `Load ${shops.length - nextBatch} more results`);
-        } else {
-            loadMoreButton.remove();
-            store.set('loadMoreState', { shops: [], currentlyShowing: 0 });
+        // Continue from the first new result for keyboard / screen reader users.
+        if (newItems.length) {
+            newItems[0].setAttribute('tabindex', '-1');
+            newItems[0].focus();
         }
     }
 
@@ -485,10 +632,77 @@
         }, CONSTANTS.SEARCH_DEBOUNCE_MS);
     }
 
+    /**
+     * Fetch one page of /search for `query` ({q, state, price}).
+     * Returns { shops, total, page, hasNext }; total/hasNext come from the
+     * API's pagination metadata (a response without it is a single page).
+     */
+    async function fetchSearchPage(query, page) {
+        const result = await api.get('/search', {
+            query: { ...query, page, limit: CONSTANTS.SEARCH_API_PAGE_SIZE },
+            withMeta: true,
+        });
+        // An older cached ApiClient (pre-withMeta) returns the bare array;
+        // treat that as a single page with no pagination metadata.
+        const { data, metadata } = Array.isArray(result)
+            ? { data: result, metadata: null }
+            : (result || {});
+
+        if (!Array.isArray(data)) {
+            throw new Error('Invalid data format: expected array');
+        }
+
+        // Filter out invalid shop entries
+        const shops = data.filter(isValidShop);
+        // How many records the server sent (and counted in its total) that we dropped.
+        const rejected = data.length - shops.length;
+        const p = metadata && metadata.pagination;
+        if (p && typeof p.total === 'number') {
+            return { shops, total: p.total, page: p.page || page, hasNext: Boolean(p.hasNext), rejected };
+        }
+        return { shops, total: shops.length, page, hasNext: false, rejected };
+    }
+
+    /**
+     * Start a new search generation: invalidates in-flight requests for the
+     * previous search and drops its pagination cursor (its results are about
+     * to be replaced). Returns the new generation.
+     */
+    function startNewSearchGeneration() {
+        searchGeneration += 1;
+        store.set('loadMoreState', EMPTY_LOAD_MORE_STATE);
+        return searchGeneration;
+    }
+
+    /**
+     * Fetch pages of /search starting at `startPage`, skipping forward past
+     * pages whose records were all rejected by isValidShop while the API says
+     * more pages exist, so a wholly-invalid page doesn't end the results.
+     * Bounded to MAX_SKIPPED_PAGES extra requests. Returns the same shape as
+     * fetchSearchPage, with `page` = the last page fetched and `rejected`
+     * summed over every page fetched.
+     */
+    async function fetchSearchPages(query, startPage) {
+        let result = await fetchSearchPage(query, startPage);
+        let rejected = result.rejected;
+        for (let skipped = 0;
+            skipped < CONSTANTS.MAX_SKIPPED_PAGES
+                && result.shops.length === 0 && result.rejected > 0 && result.hasNext;
+            skipped++) {
+            result = await fetchSearchPage(query, result.page + 1);
+            rejected += result.rejected;
+        }
+        return { ...result, rejected };
+    }
+
     async function searchCoffeeShops() {
         const searchTerm = dom.searchInput?.value || '';
         const selectedState = dom.stateFilter?.value || '';
         const selectedPrice = dom.priceFilter?.value || '';
+
+        // A new search supersedes every in-flight request for the old one
+        // (its first page or a "Load More" page) and its pagination cursor.
+        const generation = startNewSearchGeneration();
 
         // Update URL with search parameters
         updateURLParams({ q: searchTerm, state: selectedState, price: selectedPrice });
@@ -506,26 +720,17 @@
         showLoadingState();
 
         try {
-            const data = await api.get('/search', {
-                query: {
-                    q: searchTerm,
-                    state: selectedState,
-                    price: selectedPrice,
-                },
-            });
-
-            if (!Array.isArray(data)) {
-                throw new Error('Invalid data format: expected array');
-            }
-
-            // Filter out invalid shop entries
-            const filteredShops = data.filter(isValidShop);
+            const query = { q: searchTerm, state: selectedState, price: selectedPrice };
+            const result = await fetchSearchPages(query, 1);
+            // An even newer search started while this one was in flight.
+            if (generation !== searchGeneration) return;
 
             hideLoadingState();
             // The 'lastSearchResults' subscriber (createStore wiring in initialize)
             // calls displayResults — no explicit call needed here.
-            store.set('lastSearchResults', filteredShops);
+            store.set('lastSearchResults', { ...result, query });
         } catch (error) {
+            if (generation !== searchGeneration) return;
             hideLoadingState();
             handleError(error, 'searchCoffeeShops');
 
@@ -545,6 +750,7 @@
             return;
         }
 
+        startNewSearchGeneration();
         showLoadingState();
 
         navigator.geolocation.getCurrentPosition(async (position) => {
@@ -554,7 +760,9 @@
                 shops.sort((a, b) => a.distance - b.distance);
                 hideLoadingState();
                 // Subscriber on 'lastSearchResults' calls displayResults.
-                store.set('lastSearchResults', shops);
+                store.set('lastSearchResults', {
+                    shops, total: shops.length, page: 1, hasNext: false, query: null
+                });
             } catch (error) {
                 hideLoadingState();
                 handleError(error, 'findNearbyShops');
@@ -707,7 +915,7 @@
         if (dom.searchResultsContainer) {
             dom.searchResultsContainer.addEventListener('click', (event) => {
                 if (event.target.classList.contains('load-more')) {
-                    loadMoreResults();
+                    loadMoreResults().catch(err => handleError(err, 'loadMoreResults'));
                 }
             });
         }
@@ -814,10 +1022,13 @@
             //     whenever the index list of available states is replaced.
             //   - lastSearchResults → displayResults: re-renders the search
             //     results list whenever a new search finishes.
+            //   - loadMoreState → renderSearchPagination: keeps the "Showing X
+            //     of Y" line and the Load More button in step with the cursor.
             // Per ADR-0001, there is no subscribeAll — each renderer subscribes
             // to ONLY the key it actually reads.
             store.subscribe('availableStates', createStateGrid);
             store.subscribe('lastSearchResults', displayResults);
+            store.subscribe('loadMoreState', renderSearchPagination);
 
             const serverIsRunning = await checkServerStatus();
             if (serverIsRunning) {

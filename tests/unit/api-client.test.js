@@ -422,3 +422,76 @@ describe('ApiClient — headers', () => {
     expect(received).toBe('Bearer xyz');
   });
 });
+
+describe('ApiClient — withMeta (pagination metadata)', () => {
+  const pagination = { page: 2, limit: 100, total: 1240, totalPages: 13, hasNext: true, hasPrev: true };
+
+  it('returns {data, metadata} when withMeta is true', async () => {
+    server.use(
+      http.get('*/api/v1/paged', () => HttpResponse.json({
+        success: true,
+        data: [{ id: 1 }, { id: 2 }],
+        metadata: { pagination, state: 'CA' },
+      }))
+    );
+
+    const result = await api.get('/paged', { withMeta: true, query: { page: 2 } });
+    expect(result).toEqual({
+      data: [{ id: 1 }, { id: 2 }],
+      metadata: { pagination, state: 'CA' },
+    });
+  });
+
+  it('still returns bare data by default when the envelope carries metadata', async () => {
+    server.use(
+      http.get('*/api/v1/paged-default', () => HttpResponse.json({
+        success: true,
+        data: [{ id: 1 }],
+        metadata: { pagination },
+      }))
+    );
+
+    const result = await api.get('/paged-default');
+    expect(result).toEqual([{ id: 1 }]);
+  });
+
+  it('returns metadata: null when the envelope has no metadata', async () => {
+    server.use(
+      http.get('*/api/v1/no-meta', () => HttpResponse.json({ success: true, data: [1, 2, 3] }))
+    );
+
+    const result = await api.get('/no-meta', { withMeta: true });
+    expect(result).toEqual({ data: [1, 2, 3], metadata: null });
+  });
+
+  it('keeps envelope validation: {success: false} still throws ApiEnvelopeError', async () => {
+    server.use(
+      http.get('*/api/v1/meta-fail', () => HttpResponse.json({
+        success: false,
+        error: { message: 'nope' },
+        metadata: { pagination },
+      }))
+    );
+
+    await expect(api.get('/meta-fail', { withMeta: true, retries: 0 }))
+      .rejects.toBeInstanceOf(ApiEnvelopeError);
+  });
+
+  it('keeps envelope validation: a body without `success` still throws ApiParseError', async () => {
+    server.use(
+      http.get('*/api/v1/meta-shape', () => HttpResponse.json({ data: [], metadata: { pagination } }))
+    );
+
+    await expect(api.get('/meta-shape', { withMeta: true, retries: 0 }))
+      .rejects.toBeInstanceOf(ApiParseError);
+  });
+
+  it('returns {data: null, metadata: null} on 204 when withMeta is true', async () => {
+    server.use(
+      http.delete('*/api/v1/meta-204', () => new HttpResponse(null, { status: 204 }))
+    );
+
+    const result = await api.delete('/meta-204', { withMeta: true });
+    expect(result).toEqual({ data: null, metadata: null });
+  });
+});
