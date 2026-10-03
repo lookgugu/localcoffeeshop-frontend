@@ -3,7 +3,6 @@
 
 // Bump cache version when STATIC_ASSETS changes so existing clients
 // re-precache the new dependency list on activate.
-const CACHE_NAME = 'coffee-shop-v6';
 const STATIC_CACHE = 'coffee-shop-static-v6';
 const API_CACHE = 'coffee-shop-api-v6';
 
@@ -31,20 +30,18 @@ const STATIC_ASSETS = [
     '/consent-banner.js'
 ];
 
-// API routes to cache
-const API_ROUTES = [
-    '/api/v1/states',
-    '/api/v1/health',
-    '/api/v1/config'
-];
-
 // Install event - cache static assets
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(STATIC_CACHE)
             .then((cache) => {
                 console.log('[SW] Caching static assets');
-                return cache.addAll(STATIC_ASSETS);
+                // /dist/* is served immutable for a year without hashed
+                // filenames, so bypass the HTTP cache or a new worker would
+                // precache whatever stale copy the browser already holds.
+                return cache.addAll(
+                    STATIC_ASSETS.map((url) => new Request(url, { cache: 'reload' }))
+                );
             })
             .then(() => {
                 // Skip waiting to activate immediately
@@ -52,6 +49,10 @@ self.addEventListener('install', (event) => {
             })
             .catch((error) => {
                 console.error('[SW] Failed to cache static assets:', error);
+                // Rethrow so install fails and the previous worker (with its
+                // complete cache) stays in control, instead of activating
+                // with a partial cache and then deleting the old one.
+                throw error;
             })
     );
 });
@@ -87,33 +88,41 @@ self.addEventListener('fetch', (event) => {
     const { request } = event;
     const url = new URL(request.url);
 
-    // Only handle same-origin requests
+    // Only handle same-origin requests.
+    // NOTE: in production APP_CONFIG.API_BASE_URL points at
+    // https://api.localcoffeeshop.co, so API traffic is cross-origin and the
+    // network-first branch below only applies when the API is proxied under
+    // this origin (e.g. local dev with API_BASE_URL unset).
     if (url.origin !== location.origin) {
         return;
     }
 
     // Handle API requests with network-first strategy
     if (url.pathname.startsWith('/api/')) {
-        event.respondWith(networkFirstStrategy(request));
+        event.respondWith(networkFirstStrategy(event));
         return;
     }
 
     // Handle static assets with cache-first strategy
-    event.respondWith(cacheFirstStrategy(request));
+    event.respondWith(cacheFirstStrategy(event));
 });
 
 // Network-first strategy for API requests
 // Try network first, fall back to cache if offline
-async function networkFirstStrategy(request) {
-    const cache = await caches.open(API_CACHE);
+async function networkFirstStrategy(event) {
+    const { request } = event;
+    // Open the cache while the network request is in flight
+    const cachePromise = caches.open(API_CACHE);
 
     try {
         const networkResponse = await fetch(request);
+        const cache = await cachePromise;
 
         // Cache successful GET responses
         if (request.method === 'GET' && networkResponse.ok) {
-            // Clone the response since it can only be consumed once
-            cache.put(request, networkResponse.clone());
+            // Clone the response since it can only be consumed once.
+            // waitUntil keeps the worker alive until the write finishes.
+            event.waitUntil(cache.put(request, networkResponse.clone()));
         }
 
         return networkResponse;
@@ -121,6 +130,7 @@ async function networkFirstStrategy(request) {
         console.log('[SW] Network failed, trying cache:', request.url);
 
         // Try to get from cache
+        const cache = await cachePromise;
         const cachedResponse = await cache.match(request);
         if (cachedResponse) {
             // Add header to indicate cached response
@@ -149,14 +159,23 @@ async function networkFirstStrategy(request) {
 
 // Cache-first strategy for static assets
 // Serve from cache if available, otherwise fetch from network
-async function cacheFirstStrategy(request) {
+async function cacheFirstStrategy(event) {
+    const { request } = event;
+
+    // The Cache API only stores GET; let anything else go straight through
+    if (request.method !== 'GET') {
+        return fetch(request);
+    }
+
     const cache = await caches.open(STATIC_CACHE);
 
     // Try cache first
     const cachedResponse = await cache.match(request);
     if (cachedResponse) {
-        // Return cached version but also update cache in background
-        updateCache(request, cache);
+        // Return cached version but also update cache in background.
+        // Without waitUntil the browser may stop the worker once the
+        // response is sent, killing the refresh partway.
+        event.waitUntil(updateCache(request, cache));
         return cachedResponse;
     }
 
@@ -166,16 +185,19 @@ async function cacheFirstStrategy(request) {
 
         // Cache successful responses
         if (networkResponse.ok) {
-            cache.put(request, networkResponse.clone());
+            event.waitUntil(cache.put(request, networkResponse.clone()));
         }
 
         return networkResponse;
     } catch (error) {
         console.log('[SW] Both cache and network failed:', request.url);
 
-        // Return offline page for navigation requests
+        // Return offline page for navigation requests, if we have it
         if (request.mode === 'navigate') {
-            return caches.match('/');
+            const fallback = await caches.match('/');
+            if (fallback) {
+                return fallback;
+            }
         }
 
         // Return empty response for other requests
@@ -186,9 +208,11 @@ async function cacheFirstStrategy(request) {
 // Update cache in background (stale-while-revalidate pattern)
 async function updateCache(request, cache) {
     try {
-        const networkResponse = await fetch(request);
+        // Revalidate with the server (conditional request) rather than the
+        // browser's HTTP cache, which holds /dist/* immutable for a year
+        const networkResponse = await fetch(request, { cache: 'no-cache' });
         if (networkResponse.ok) {
-            cache.put(request, networkResponse);
+            await cache.put(request, networkResponse);
         }
     } catch (error) {
         // Silently fail - we already served from cache
