@@ -26,6 +26,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { CSP_META_TAG, REFERRER_META_TAG } = require('./csp.cjs');
 
 const ROOT = path.join(__dirname, '..');
 const OUT_DIR = path.join(ROOT, 'public/pages/states');
@@ -168,7 +169,7 @@ function buildJsonLd(Price, { name, pageUrl, firstPageUrl, shops, offset = 0 }) 
         .replace(/</g, '\\u003c');
 }
 
-/** Shared <head> boilerplate for generated pages. */
+/** Shared <head> boilerplate for generated pages (CSP: see scripts/csp.cjs). */
 function renderHead({ title, description, canonical, noindex, prev, next }) {
     const t = escapeHtml(title);
     const d = escapeHtml(description);
@@ -176,6 +177,8 @@ function renderHead({ title, description, canonical, noindex, prev, next }) {
     const rel = (prev ? `\n    <link rel="prev" href="${escapeHtml(prev)}">` : '')
         + (next ? `\n    <link rel="next" href="${escapeHtml(next)}">` : '');
     return `    <meta charset="UTF-8">
+    ${CSP_META_TAG}
+    ${REFERRER_META_TAG}
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${t}</title>
     <meta name="description" content="${d}">
@@ -432,6 +435,7 @@ module.exports = {
     pageFileName,
     renderStatePages,
     renderIndexPage,
+    renderHead,
     fetchStateShops,
     mapWithConcurrency,
     main,
