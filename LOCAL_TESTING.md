@@ -16,7 +16,6 @@ cp .env.example .env
 Edit `.env` for local development:
 ```bash
 API_BASE_URL=http://localhost:3000/api/v1
-GA_MEASUREMENT_ID=G-YVSXN7PM48
 NODE_ENV=development
 ```
 
@@ -29,7 +28,6 @@ This generates `public/config.js`:
 ```javascript
 window.APP_CONFIG = {
     API_BASE_URL: 'http://localhost:3000/api/v1',
-    GA_MEASUREMENT_ID: 'G-YVSXN7PM48',
     ENVIRONMENT: 'development'
 };
 ```

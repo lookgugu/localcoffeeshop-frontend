@@ -31,7 +31,6 @@ export default defineConfig({
         'node_modules/**',
         'public/dist/**',
         'public/sw.js', // Service worker
-        'public/analytics.js', // Analytics
         'public/consent-banner.js', // Consent banner
         'public/asset-loader.js', // Asset loader
         'public/asset-loader-state.js', // Asset loader state
