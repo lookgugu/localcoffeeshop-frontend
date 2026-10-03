@@ -165,6 +165,31 @@ describe('Content Security Policy (#14)', () => {
       }
       expect(allows(directive('font-src'), 'https://fonts.gstatic.com/s/x.woff2')).toBe(true);
     });
+
+    // "Accept All" in consent-banner.js grants the ad_* consents, so with
+    // Google signals on, gtag uses the advertising-features endpoints from
+    // https://developers.google.com/tag-platform/security/guides/csp#google_analytics
+    // (*.google.<TLD> aside: only .com, see scripts/csp.cjs).
+    it('allows what Google lists for GA4 with advertising features', () => {
+      const required = {
+        'script-src': ['https://www.googletagmanager.com/gtag/js'],
+        'img-src': [
+          'https://www.googletagmanager.com/a', 'https://region1.google-analytics.com/g/collect',
+          'https://www.google.com/ads/ga-audiences', 'https://stats.g.doubleclick.net/g/collect',
+        ],
+        'connect-src': [
+          'https://www.googletagmanager.com/a', 'https://region1.google-analytics.com/g/collect',
+          'https://www.google.com/ccm/collect', 'https://stats.g.doubleclick.net/g/collect',
+          'https://pagead2.googlesyndication.com/ccm/collect',
+        ],
+        'frame-src': ['https://www.googletagmanager.com/static/service_worker/x/sw_iframe.html'],
+      };
+      for (const [name, urls] of Object.entries(required)) {
+        const sources = directive(name);
+        expect(sources, `${name} must be set (default-src 'self' would block these)`).not.toBeNull();
+        for (const url of urls) expect(allows(sources, url), `${name} must allow ${url}`).toBe(true);
+      }
+    });
   });
 
   it('netlify.toml is gone, so nothing implies headers that are not served', () => {

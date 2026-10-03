@@ -22,6 +22,13 @@
  *   *.google.com: GA4 collection endpoints (region1.google-analytics.com etc.;
  *   doubleclick/google.com only if Google signals is on). Per Google's CSP
  *   guide: https://developers.google.com/tag-platform/security/guides/csp
+ * - Advertising features (Google signals; consent-banner.js grants
+ *   ad_storage/ad_user_data/ad_personalization on "Accept All"), per the same
+ *   guide: frame-src www.googletagmanager.com (the tag may create an iframe,
+ *   which default-src 'self' would block) and connect-src
+ *   pagead2.googlesyndication.com. The guide also lists https://*.google.<TLD>
+ *   for each country TLD; CSP can't wildcard a TLD, and this is a US site, so
+ *   only *.google.com is listed (a non-.com hit is dropped, nothing breaks).
  * - fonts.googleapis.com / fonts.gstatic.com: Source Sans Pro on about and
  *   contact pages.
  * - api.localcoffeeshop.co: the API (API_BASE_URL in .do/app-spec.yaml).
@@ -39,7 +46,8 @@ const CSP_DIRECTIVES = [
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data: https://www.googletagmanager.com https://*.google-analytics.com https://*.g.doubleclick.net https://*.google.com",
-    "connect-src 'self' https://api.localcoffeeshop.co http://localhost:3000 https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com https://*.g.doubleclick.net https://*.google.com",
+    "connect-src 'self' https://api.localcoffeeshop.co http://localhost:3000 https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com https://*.g.doubleclick.net https://*.google.com https://pagead2.googlesyndication.com",
+    "frame-src 'self' https://www.googletagmanager.com",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
