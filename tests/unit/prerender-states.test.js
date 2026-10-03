@@ -15,7 +15,7 @@ import { join } from 'node:path';
 
 const require = createRequire(import.meta.url);
 const prerender = require('../../scripts/prerender-states.cjs');
-const { fetchStateShops, renderStatePages, renderIndexPage, pageFileName, resolveApiTarget, stateSlug, main } = prerender;
+const { fetchStateShops, renderStatePages, renderIndexPage, pageFileName, isDeployBuild, resolveApiTarget, stateSlug, main } = prerender;
 
 const enums = prerender.loadEnums();
 const API = 'https://api.example.test/api/v1';
@@ -78,18 +78,45 @@ describe('resolveApiTarget', () => {
       .toEqual({ apiBase: 'https://api.example.test/api/v1' });
   });
 
-  it('resolves a relative base against the site URL on Netlify (same-origin API)', () => {
-    expect(resolveApiTarget({ NETLIFY: 'true', URL: 'https://localcoffeeshop.co', API_BASE_URL: '/api/v1' }))
+  it('resolves a relative base against the site URL in a deploy build (same-origin API)', () => {
+    expect(resolveApiTarget({ NODE_ENV: 'production', API_BASE_URL: '/api/v1' }))
       .toEqual({ apiBase: 'https://localcoffeeshop.co/api/v1' });
+    expect(resolveApiTarget({ NODE_ENV: 'production', SITE_URL: 'https://staging.example.test/', API_BASE_URL: '/api/v1' }))
+      .toEqual({ apiBase: 'https://staging.example.test/api/v1' });
   });
 
-  it('defaults to /api/v1 like api-client.js when unset on Netlify', () => {
-    expect(resolveApiTarget({ NETLIFY: 'true', URL: 'https://preview--site.netlify.app' }))
-      .toEqual({ apiBase: 'https://preview--site.netlify.app/api/v1' });
+  it('defaults to /api/v1 like api-client.js when unset in a deploy build', () => {
+    expect(resolveApiTarget({ NODE_ENV: 'production' }))
+      .toEqual({ apiBase: 'https://localcoffeeshop.co/api/v1' });
   });
 
   it('skips local builds that only have a relative base', () => {
     expect(resolveApiTarget({ API_BASE_URL: '/api/v1' }).skip).toMatch(/relative/);
+  });
+});
+
+describe('DigitalOcean App Platform spec', () => {
+  // The safeguard only engages in deploy builds, detected via NODE_ENV. If the
+  // spec stopped setting it (or the API URL) at build time, deploys would
+  // silently skip the prerender and publish canonical links to missing pages.
+  const spec = readFileSync(new URL('../../.do/app-spec.yaml', import.meta.url), 'utf8');
+  const buildEnv = (key) => {
+    const block = spec.match(new RegExp(`- key: ${key}\\n\\s+value: (\\S+)\\n\\s+scope: (\\S+)`));
+    return block && { value: block[1], scope: block[2] };
+  };
+
+  it('marks builds as deploy builds (NODE_ENV=production at build time)', () => {
+    const env = { NODE_ENV: buildEnv('NODE_ENV')?.value };
+    expect(buildEnv('NODE_ENV')?.scope).toMatch(/BUILD_TIME|RUN_AND_BUILD_TIME/);
+    expect(isDeployBuild(env)).toBe(true);
+  });
+
+  it('gives the build an absolute API_BASE_URL', () => {
+    const api = buildEnv('API_BASE_URL');
+    expect(api?.scope).toMatch(/BUILD_TIME|RUN_AND_BUILD_TIME/);
+    expect(resolveApiTarget({ NODE_ENV: 'production', API_BASE_URL: api.value }))
+      .toEqual({ apiBase: api.value.replace(/\/+$/, '') });
+    expect(api.value).toMatch(/^https:\/\//);
   });
 });
 
@@ -270,11 +297,11 @@ describe('main (build step)', () => {
     expect(readdirSync(outDir)).toEqual(['previous.html']);
   });
 
-  it('never skips on Netlify: a relative base is fetched from the site, and failures fail the build', async () => {
+  it('never skips a deploy build: a relative base is fetched from the site, and failures fail the build', async () => {
     const fetchImpl = vi.fn(async () => new Response('not found', { status: 404 }));
 
     await expect(main({
-      env: { NETLIFY: 'true', URL: 'https://localcoffeeshop.co', API_BASE_URL: '/api/v1' },
+      env: { NODE_ENV: 'production', API_BASE_URL: '/api/v1' },
       fetchImpl, outDir, log,
     })).rejects.toThrow(/HTTP 404/);
 
@@ -303,8 +330,19 @@ describe('main (build step)', () => {
     const fetchImpl = vi.fn(async (url, init) =>
       url.includes('/states/NV?') ? new Response('down', { status: 500 }) : ok(url, init));
 
-    await expect(main({ env: { API_BASE_URL: API }, fetchImpl, outDir, log })).rejects.toThrow(/HTTP 500/);
+    await expect(main({ env: { NODE_ENV: 'production', API_BASE_URL: API }, fetchImpl, outDir, log }))
+      .rejects.toThrow(/HTTP 500/);
 
+    expect(readdirSync(outDir)).toEqual(['previous.html']);
+  });
+
+  it('only warns in a local build when the API is unreachable, keeping existing pages', async () => {
+    const fetchImpl = vi.fn(async () => { throw new TypeError('fetch failed'); });
+
+    const result = await main({ env: { API_BASE_URL: 'http://localhost:3000/api/v1' }, fetchImpl, outDir, log });
+
+    expect(result.skipped).toBe(true);
+    expect(log.warn).toHaveBeenCalledWith(expect.stringContaining("couldn't fetch from http://localhost:3000/api/v1"));
     expect(readdirSync(outDir)).toEqual(['previous.html']);
   });
 });

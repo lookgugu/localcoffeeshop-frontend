@@ -9,14 +9,17 @@
  * pages carry the same listings and structured data in plain HTML, and are the
  * canonical URLs (state.js points its canonical link here).
  *
- * API base: API_BASE_URL, defaulting to '/api/v1' like api-client.js. A
- * relative base (the same-origin setup) is resolved against the site URL on
- * Netlify. Locally, a relative base means there is no API to build from, so
- * the step is skipped with a warning.
+ * Deploy builds are those with NODE_ENV=production, which the DigitalOcean
+ * App Platform spec (.do/app-spec.yaml) sets at build time.
  *
- * Failure policy: on Netlify any failed fetch fails the build, so the last
- * good deploy stays live; we never publish a partial set, or canonical links
- * to pages that don't exist.
+ * API base: API_BASE_URL, defaulting to '/api/v1' like api-client.js. In a
+ * deploy build a relative base (the same-origin setup) is resolved against
+ * SITE_URL. Locally, a relative base means there is no API to build from.
+ *
+ * Failure policy: in a deploy build any failed fetch fails the build, so
+ * App Platform keeps the last good deploy live; we never publish a partial
+ * set, or canonical links to pages that don't exist. Locally, a missing or
+ * unreachable API only warns and skips, leaving existing output untouched.
  *
  * Output is generated, not committed (see .gitignore).
  */
@@ -46,9 +49,14 @@ function loadEnums() {
     return sandbox.module.exports;
 }
 
+/** Deploy (production) build, as opposed to a local one. */
+function isDeployBuild(env = process.env) {
+    return env.NODE_ENV === 'production';
+}
+
 /**
  * Decide where to fetch from. Returns { apiBase } (absolute URL) or
- * { skip: reason } for local builds that have no reachable API.
+ * { skip: reason } for local builds that have no API to build from.
  */
 function resolveApiTarget(env = process.env) {
     let base = env.API_BASE_URL;
@@ -63,11 +71,11 @@ function resolveApiTarget(env = process.env) {
     if (/^https?:\/\//.test(base)) return { apiBase: base };
 
     // Relative base: the API is served under the site's own origin.
-    if (env.NETLIFY === 'true') {
-        const site = (env.URL || SITE_URL).replace(/\/+$/, '');
+    if (isDeployBuild(env)) {
+        const site = (env.SITE_URL || SITE_URL).replace(/\/+$/, '');
         return { apiBase: new URL(base, `${site}/`).href.replace(/\/+$/, '') };
     }
-    return { skip: `API_BASE_URL is "${base}", which is relative, and this isn't a Netlify build` };
+    return { skip: `API_BASE_URL is "${base}", which is relative, and this isn't a deploy build (NODE_ENV=production)` };
 }
 
 /**
@@ -382,10 +390,18 @@ async function main({ env = process.env, fetchImpl = fetch, outDir = OUT_DIR, lo
 
     const enums = loadEnums();
     const codes = enums.allStateCodes();
-    const results = await mapWithConcurrency(codes, CONCURRENCY, async (code) => ({
-        code,
-        shops: await fetchStateShops(apiBase, code, { fetchImpl }),
-    }));
+    let results;
+    try {
+        results = await mapWithConcurrency(codes, CONCURRENCY, async (code) => ({
+            code,
+            shops: await fetchStateShops(apiBase, code, { fetchImpl }),
+        }));
+    } catch (err) {
+        if (isDeployBuild(env)) throw err;
+        // Local build with the API not running: don't break `npm run build`
+        log.warn(`⚠️  Skipping state prerender: couldn't fetch from ${apiBase} (${err.message}). Existing state pages left as-is.`);
+        return { skipped: true };
+    }
 
     // Only touch the output directory once every fetch has succeeded.
     fs.rmSync(outDir, { recursive: true, force: true });
@@ -407,6 +423,7 @@ async function main({ env = process.env, fetchImpl = fetch, outDir = OUT_DIR, lo
 
 module.exports = {
     loadEnums,
+    isDeployBuild,
     resolveApiTarget,
     stateSlug,
     escapeHtml,
@@ -422,7 +439,7 @@ module.exports = {
 
 if (require.main === module) {
     main().catch((err) => {
-        console.error('❌ State prerender failed; failing the build so the last good deploy stays live.');
+        console.error('❌ State prerender failed in a deploy build; failing the build so the last good deploy stays live.');
         console.error(err);
         process.exit(1);
     });
