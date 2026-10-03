@@ -41,6 +41,8 @@
         // "Load More" reveals already-fetched shops first and only requests
         // the next API page once those run out.
         SEARCH_API_PAGE_SIZE: 100,
+        // Pages to skip past when a whole API page fails validation.
+        MAX_SKIPPED_PAGES: 3,
 
         // Network Settings
         INIT_TIMEOUT_MS: 30000   // 30 second timeout for full initialization
@@ -88,6 +90,11 @@
     let searchTimeout = null;   // debounce timer for the search input
     let resizeTimeout = null;   // debounce timer for window resize
     let gridColumns = null;     // cached column count for keyboard nav
+    // Request-generation token for search: bumped whenever a new search (or
+    // "near me" lookup) starts. Every async search request captures it and
+    // drops its response if it changed, so a slow response for an old search
+    // can never render into a newer one.
+    let searchGeneration = 0;
     const resultsElements = []; // DOM nodes accumulated during render
     const dom = {               // cached element references
         searchResultsContainer: null,
@@ -459,19 +466,24 @@
         if (state.currentlyShowing >= state.shops.length) {
             if (!state.hasNext) return;
             const query = state.query;
+            const generation = searchGeneration;
+            // Superseded if a newer search started (generation bumped) or the
+            // cursor now belongs to different results.
+            const isStale = () => generation !== searchGeneration
+                || store.get('loadMoreState').query !== query;
             store.update('loadMoreState', prev => ({ ...prev, loading: true }));
             let next;
             try {
-                next = await fetchSearchPage(query, state.page + 1);
+                next = await fetchSearchPages(query, state.page + 1);
             } catch (error) {
                 // A newer search replaced these results; drop the stale outcome.
-                if (store.get('loadMoreState').query !== query) return;
+                if (isStale()) return;
                 handleError(error, 'loadMoreResults');
                 store.update('loadMoreState', prev => ({ ...prev, loading: false }));
                 showUserError('Failed to load more coffee shops. Please try again.');
                 return;
             }
-            if (store.get('loadMoreState').query !== query) return;
+            if (isStale()) return;
             store.update('loadMoreState', prev => {
                 // Skip shops already fetched (data can shift between page requests).
                 const seen = new Set(prev.shops.map(s => s.id).filter(id => id != null));
@@ -651,10 +663,46 @@
         return { shops, total: shops.length, page, hasNext: false, rejected };
     }
 
+    /**
+     * Start a new search generation: invalidates in-flight requests for the
+     * previous search and drops its pagination cursor (its results are about
+     * to be replaced). Returns the new generation.
+     */
+    function startNewSearchGeneration() {
+        searchGeneration += 1;
+        store.set('loadMoreState', EMPTY_LOAD_MORE_STATE);
+        return searchGeneration;
+    }
+
+    /**
+     * Fetch pages of /search starting at `startPage`, skipping forward past
+     * pages whose records were all rejected by isValidShop while the API says
+     * more pages exist, so a wholly-invalid page doesn't end the results.
+     * Bounded to MAX_SKIPPED_PAGES extra requests. Returns the same shape as
+     * fetchSearchPage, with `page` = the last page fetched and `rejected`
+     * summed over every page fetched.
+     */
+    async function fetchSearchPages(query, startPage) {
+        let result = await fetchSearchPage(query, startPage);
+        let rejected = result.rejected;
+        for (let skipped = 0;
+            skipped < CONSTANTS.MAX_SKIPPED_PAGES
+                && result.shops.length === 0 && result.rejected > 0 && result.hasNext;
+            skipped++) {
+            result = await fetchSearchPage(query, result.page + 1);
+            rejected += result.rejected;
+        }
+        return { ...result, rejected };
+    }
+
     async function searchCoffeeShops() {
         const searchTerm = dom.searchInput?.value || '';
         const selectedState = dom.stateFilter?.value || '';
         const selectedPrice = dom.priceFilter?.value || '';
+
+        // A new search supersedes every in-flight request for the old one
+        // (its first page or a "Load More" page) and its pagination cursor.
+        const generation = startNewSearchGeneration();
 
         // Update URL with search parameters
         updateURLParams({ q: searchTerm, state: selectedState, price: selectedPrice });
@@ -673,13 +721,16 @@
 
         try {
             const query = { q: searchTerm, state: selectedState, price: selectedPrice };
-            const result = await fetchSearchPage(query, 1);
+            const result = await fetchSearchPages(query, 1);
+            // An even newer search started while this one was in flight.
+            if (generation !== searchGeneration) return;
 
             hideLoadingState();
             // The 'lastSearchResults' subscriber (createStore wiring in initialize)
             // calls displayResults — no explicit call needed here.
             store.set('lastSearchResults', { ...result, query });
         } catch (error) {
+            if (generation !== searchGeneration) return;
             hideLoadingState();
             handleError(error, 'searchCoffeeShops');
 
@@ -699,6 +750,7 @@
             return;
         }
 
+        startNewSearchGeneration();
         showLoadingState();
 
         navigator.geolocation.getCurrentPosition(async (position) => {

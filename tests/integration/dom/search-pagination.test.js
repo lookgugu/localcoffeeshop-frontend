@@ -361,6 +361,83 @@ describe('frontend.js — search pagination (#16)', () => {
     expect(loadMore()).toBeNull();
   });
 
+  it('drops a load-more page that lands after a new search started but before its first page arrived', async () => {
+    const tx = makeShops(230);
+    const latte = makeShops(3, 'Latte');
+    server.use(
+      http.get('*/api/v1/health', () => HttpResponse.json({ success: true, data: { status: 'ok' } })),
+      http.get('*/api/v1/search', async ({ request }) => {
+        const url = new URL(request.url);
+        const page = Number(url.searchParams.get('page') || 1);
+        requests.push({ page, q: url.searchParams.get('q') });
+        if (url.searchParams.get('q') === 'latte') {
+          await delay(700); // new search's first page is slow
+          return HttpResponse.json({ success: true, data: latte, metadata: { pagination: { page: 1, limit: 100, total: 3, totalPages: 1, hasNext: false, hasPrev: false } } });
+        }
+        if (page === 2) await delay(500); // old load-more lands mid new search
+        return HttpResponse.json({
+          success: true,
+          data: tx.slice((page - 1) * 100, page * 100),
+          metadata: { pagination: { page, limit: 100, total: 230, totalPages: 3, hasNext: page < 3, hasPrev: page > 1 } },
+        });
+      })
+    );
+    vi.resetModules();
+    await import('../../../public/frontend.js');
+
+    await waitFor(() => expect(results()).toHaveLength(50));
+    click(loadMore());
+    await waitFor(() => expect(results()).toHaveLength(100));
+    click(loadMore()); // page 2 in flight (500ms)
+    input(document.getElementById('searchInput'), 'latte'); // search starts after 300ms debounce
+
+    // New search is showing its skeleton; the old page 2 resolves meanwhile.
+    await waitFor(() => expect(requests.some((r) => r.q === 'latte')).toBe(true));
+    await waitFor(() => expect(requests.filter((r) => r.page === 2)).toHaveLength(1));
+    await new Promise((r) => setTimeout(r, 350)); // past the old page 2's 500ms
+    expect(document.querySelectorAll('#searchResults .skeleton-item').length).toBeGreaterThan(0);
+    expect(results()).toHaveLength(0);
+    expect(loadMore()).toBeNull();
+    expect(document.activeElement?.classList.contains('coffee-item')).not.toBe(true);
+
+    await waitFor(() => expect(resultCount()?.textContent).toBe('3 found'));
+    expect(results()).toHaveLength(3);
+    expect(results()[0].querySelector('h3').textContent).toBe('Latte 1');
+  });
+
+  it('skips past a first page whose records are all invalid when more pages exist', async () => {
+    const all = makeShops(130);
+    const badPage = Array.from({ length: 100 }, (_, i) => invalid(5000 + i));
+    await boot(customSearchHandler([badPage, all.slice(0, 100), all.slice(100, 130)], 230));
+
+    await waitFor(() => expect(results()).toHaveLength(50));
+    expect(requests.map((r) => r.page)).toEqual([1, 2]);
+    expect(document.querySelector('#searchResults .no-results')).toBeNull();
+    expect(resultCount().textContent).toBe('Showing 50 of 130');
+
+    click(loadMore());
+    await waitFor(() => expect(results()).toHaveLength(100));
+    click(loadMore()); // page 3
+    await waitFor(() => expect(results()).toHaveLength(130));
+    expect(resultCount().textContent).toBe('130 found');
+    expect(loadMore()).toBeNull();
+  });
+
+  it('"Load More" skips past a wholly invalid page in one click', async () => {
+    const all = makeShops(130);
+    const badPage = Array.from({ length: 100 }, (_, i) => invalid(5000 + i));
+    await boot(customSearchHandler([all.slice(0, 100), badPage, all.slice(100, 130)], 230));
+    await waitFor(() => expect(results()).toHaveLength(50));
+    click(loadMore());
+    await waitFor(() => expect(results()).toHaveLength(100));
+
+    click(loadMore()); // page 2 is all invalid -> continues to page 3
+    await waitFor(() => expect(results()).toHaveLength(130));
+    expect(requests.map((r) => r.page)).toEqual([1, 2, 3]);
+    expect(resultCount().textContent).toBe('130 found');
+    expect(loadMore()).toBeNull();
+  });
+
   it('falls back to a single page when an older cached ApiClient ignores withMeta', async () => {
     // Old ApiClient: get() returns the bare data array whatever the options.
     window.ApiClient = { ...api, get: (path, opts) => api.get(path, { ...opts, withMeta: false }) };
