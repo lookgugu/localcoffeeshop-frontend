@@ -37,6 +37,8 @@
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 
+    <link rel="stylesheet" href="/dist/styles.min.css">
+
     <!-- Configuration (generated at build time) -->
     <script src="/config.js"></script>
 
@@ -72,8 +74,12 @@
       gtag('config', 'G-YVSXN7PM48');
     </script>
 
-    <!-- Asset loader handles CSS and JS paths for production/development -->
-    <script src="/asset-loader-state.js"></script>
+    <!-- Page JS: declared in markup so the preload scanner fetches it in
+         parallel; defer keeps it off the critical rendering path and runs it
+         in this order after parsing. /dist/state.bundle.min.js bundles the page code
+         with its deps (scripts/build-js.cjs). -->
+    <script defer src="/consent-banner.js"></script>
+    <script defer src="/dist/state.bundle.min.js"></script>
 </head>
 <body>
     <div class="container">

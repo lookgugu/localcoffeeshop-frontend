@@ -123,10 +123,10 @@ describe('internal links', () => {
     expect(fromRoot).toEqual(expect.arrayContaining([{ ref: 'submit.html', path: '/submit.html' }]));
   });
 
-  it('checks URLs that JS assigns to src, e.g. injected scripts', () => {
-    const loader = join(PUBLIC, 'asset-loader.js');
-    expect(internalRefs(loader, '/asset-loader.js'))
-      .toEqual(expect.arrayContaining([{ ref: '/consent-banner.js', path: '/consent-banner.js' }]));
+  it('checks URLs that JS assigns to href/src, including template literals', () => {
+    const frontend = join(PUBLIC, 'frontend.js');
+    expect(internalRefs(frontend, '/frontend.js'))
+      .toEqual(expect.arrayContaining([{ ref: '/html/state.html?code=', path: '/html/state.html' }]));
   });
 
   it('resolve to files the deployed site serves', () => {

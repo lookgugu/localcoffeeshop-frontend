@@ -3,28 +3,22 @@
 
 // Bump cache version when STATIC_ASSETS changes so existing clients
 // re-precache the new dependency list on activate.
-const STATIC_CACHE = 'coffee-shop-static-v7';
+const STATIC_CACHE = 'coffee-shop-static-v8';
 const API_CACHE = 'coffee-shop-api-v7';
 
 // Static assets to cache on install.
-// IMPORTANT: keep this in sync with the asset loaders — every dist bundle
-// required by asset-loader[-state].js before the page becomes interactive
-// must be listed here, or first-offline-visit will fail the hard-dep checks.
+// IMPORTANT: keep this in sync with the <link>/<script> tags in
+// public/html/index.html and state.html — every asset those pages need before
+// they become interactive must be listed here, or first-offline-visit will
+// fail the hard-dep checks. Each /dist/*.bundle.min.js is a whole-page bundle
+// (scripts/build-js.cjs).
 const STATIC_ASSETS = [
     '/',
     '/html/index.html',
     '/html/state.html',
-    '/asset-loader.js',
-    '/asset-loader-state.js',
     '/dist/styles.min.css',
-    '/dist/app.min.js',
-    '/dist/enums.min.js',
-    '/dist/skeleton.min.js',
-    '/dist/service-worker-registration.min.js',
-    '/dist/connection-banner.min.js',
-    '/dist/state.min.js',
-    '/dist/api-client.min.js',
-    '/dist/store.min.js',
+    '/dist/app.bundle.min.js',
+    '/dist/state.bundle.min.js',
     '/geo-consent-default.js',
     '/consent-banner.js'
 ];
