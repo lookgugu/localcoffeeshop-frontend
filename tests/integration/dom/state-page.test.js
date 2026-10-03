@@ -28,7 +28,7 @@ function mountDom() {
     ['meta', 'metaDescription'],
     ['meta', 'metaOgTitle'],
     ['meta', 'metaOgDescription'],
-    ['link', 'canonicalLink'],
+    ['link', 'canonicalUrl'],
   ]) {
     const el = document.createElement(tag);
     el.id = id;
@@ -120,5 +120,22 @@ describe('state.js — invalid API response shape', () => {
     expect(document.getElementById('pageTitle').textContent).toBe('Coffee Shops in California');
     expect(document.getElementById('totalShops').textContent).toBe('1');
     expect(document.querySelector('#coffeeList .coffee-item h3')?.textContent).toBe('Cafe Test');
+  });
+
+  it('points its canonical link and JSON-LD at the prerendered static page', async () => {
+    Object.defineProperty(document, 'readyState', { configurable: true, value: 'complete' });
+    server.use(
+      http.get('*/api/v1/config', () => HttpResponse.json({ success: true, data: { frontendUrl: 'http://localhost' } })),
+      http.get('*/api/v1/states/CA', () => HttpResponse.json({ success: true, data: [] }))
+    );
+
+    vi.resetModules();
+    await import('../../../public/html/state.js');
+    await new Promise((r) => setTimeout(r, 100));
+
+    const staticPage = 'http://localhost/pages/states/california.html';
+    expect(document.getElementById('canonicalUrl').getAttribute('href')).toBe(staticPage);
+    const jsonLd = JSON.parse(document.getElementById('stateJsonLd').textContent);
+    expect(jsonLd['@graph'][1]['@id']).toBe(staticPage);
   });
 });
