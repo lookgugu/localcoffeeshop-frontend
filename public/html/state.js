@@ -5,7 +5,7 @@
  */
 
 // Hard dep on enums + skeleton + api-client + store — fail loud if missing
-// (script order is enforced by asset-loader-state.js).
+// (they're bundled ahead of this file in /dist/state.bundle.min.js, scripts/build-js.cjs).
 if (!window.CoffeeShopEnums) {
     throw new Error('window.CoffeeShopEnums not loaded — check script order in HTML');
 }
@@ -422,10 +422,10 @@ async function loadCoffeeShops() {
     injectStructuredData(fullStateName, stateCode, store.get('shops') || []);
 }
 
-// Initialize the page. The state bundle is injected dynamically by
-// asset-loader-state.js; on cached/mobile loads it can execute after
-// DOMContentLoaded has already fired. In that case, run immediately instead of
-// registering a listener that will never fire.
+// Initialize the page. The state bundle loads with <script defer>, so the DOM
+// is already parsed here (readyState 'interactive'); if this script is ever
+// run some other way after DOMContentLoaded has fired, a listener would never
+// fire, so run immediately unless the document is still loading.
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', loadCoffeeShops);
 } else {

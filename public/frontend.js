@@ -8,8 +8,8 @@
     // ============================================================================
 
     // Hard dep on enums + skeleton + api-client + store — fail loud
-    // if any are missing instead of silently falling back. Script-load order
-    // is enforced by the asset loader (async=false on dynamically-injected tags).
+    // if any are missing instead of silently falling back. They're bundled
+    // ahead of this file in /dist/app.bundle.min.js (scripts/build-js.cjs).
     if (!window.CoffeeShopEnums) {
         throw new Error('window.CoffeeShopEnums not loaded — check script order in HTML');
     }

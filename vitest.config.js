@@ -32,8 +32,6 @@ export default defineConfig({
         'public/dist/**',
         'public/sw.js', // Service worker
         'public/consent-banner.js', // Consent banner
-        'public/asset-loader.js', // Asset loader
-        'public/asset-loader-state.js', // Asset loader state
         'public/submit.js', // Form submission
         'public/html/**', // HTML directory
         'scripts/**',

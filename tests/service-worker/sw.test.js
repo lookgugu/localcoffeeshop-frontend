@@ -285,7 +285,7 @@ describe('Service Worker', () => {
 
     it('should precache JS bundles, CSS and consent files', () => {
       expect(sw.STATIC_ASSETS).toEqual(expect.arrayContaining([
-        '/dist/app.min.js',
+        '/dist/app.bundle.min.js',
         '/dist/styles.min.css',
         '/geo-consent-default.js',
         '/consent-banner.js',
@@ -298,7 +298,7 @@ describe('Service Worker', () => {
 
     it('should fail install when precaching fails, so the old worker stays in control', async () => {
       sw.fetch.mockImplementation(async (request) =>
-        new Response('', { status: request.url.endsWith('/dist/app.min.js') ? 404 : 200 })
+        new Response('', { status: request.url.endsWith('/dist/app.bundle.min.js') ? 404 : 200 })
       );
 
       // A rejected waitUntil aborts the install; swallowing it would activate
@@ -528,7 +528,7 @@ describe('Service Worker', () => {
       await sw.runLifecycle('install');
       sw.fetch.mockRejectedValue(new TypeError('Failed to fetch'));
 
-      for (const asset of ['/html/index.html', '/dist/app.min.js', '/dist/styles.min.css']) {
+      for (const asset of ['/html/index.html', '/dist/app.bundle.min.js', '/dist/styles.min.css']) {
         const response = await sw.dispatchFetch(asset);
         expect(response.status, asset).toBe(200);
       }
