@@ -25,6 +25,7 @@ const urls = [
     { loc: '/about.html', changefreq: 'monthly', priority: '0.5' },
     { loc: '/submit.html', changefreq: 'monthly', priority: '0.6' },
     { loc: '/pages/contact.html', changefreq: 'monthly', priority: '0.4' },
+    { loc: '/pages/privacy.html', changefreq: 'yearly', priority: '0.2' },
     { loc: '/pages/states/', changefreq: 'weekly', priority: '0.8' },
 ];
 
