@@ -9,10 +9,14 @@
  * pages carry the same listings and structured data in plain HTML, and are the
  * canonical URLs (state.js points its canonical link here).
  *
- * Failure policy: when API_BASE_URL is an absolute http(s) URL (production),
- * any failed state fetch fails the build, so Netlify keeps serving the last
- * good deploy rather than publishing a partial set. When it isn't (local dev),
+ * API base: API_BASE_URL, defaulting to '/api/v1' like api-client.js. A
+ * relative base (the same-origin setup) is resolved against the site URL on
+ * Netlify. Locally, a relative base means there is no API to build from, so
  * the step is skipped with a warning.
+ *
+ * Failure policy: on Netlify any failed fetch fails the build, so the last
+ * good deploy stays live; we never publish a partial set, or canonical links
+ * to pages that don't exist.
  *
  * Output is generated, not committed (see .gitignore).
  */
@@ -42,15 +46,42 @@ function loadEnums() {
     return sandbox.module.exports;
 }
 
-/** Read API_BASE_URL from the environment, falling back to .env like inject-config. */
-function resolveApiBase(env = process.env) {
+/**
+ * Decide where to fetch from. Returns { apiBase } (absolute URL) or
+ * { skip: reason } for local builds that have no reachable API.
+ */
+function resolveApiTarget(env = process.env) {
     let base = env.API_BASE_URL;
     const envPath = path.join(ROOT, '.env');
     if (!base && fs.existsSync(envPath)) {
         const match = fs.readFileSync(envPath, 'utf8').match(/^API_BASE_URL=(.*)$/m);
         if (match) base = match[1].trim();
     }
-    return base ? base.replace(/\/+$/, '') : null;
+    // Same default as api-client.js
+    base = (base || '/api/v1').replace(/\/+$/, '');
+
+    if (/^https?:\/\//.test(base)) return { apiBase: base };
+
+    // Relative base: the API is served under the site's own origin.
+    if (env.NETLIFY === 'true') {
+        const site = (env.URL || SITE_URL).replace(/\/+$/, '');
+        return { apiBase: new URL(base, `${site}/`).href.replace(/\/+$/, '') };
+    }
+    return { skip: `API_BASE_URL is "${base}", which is relative, and this isn't a Netlify build` };
+}
+
+/**
+ * Slug for a state's static page: 'NY' -> 'new-york', 'DC' -> 'washington-d-c'.
+ * public/html/state.js has the same function for its canonical link; a test
+ * checks the two agree. (enums.js must stay identical to the backend repo,
+ * so it can't live there.)
+ */
+function stateSlug(enums, code) {
+    if (!enums.isStateCode(code)) return null;
+    return enums.stateName(code)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
 }
 
 function escapeHtml(value) {
@@ -190,9 +221,9 @@ function renderPagination(slug, page, pageCount) {
  * Returns [{ fileName, html }]; a state with no shops gets one noindex page.
  */
 function renderStatePages(enums, { code, shops }) {
-    const { Price, stateName, stateSlug } = enums;
+    const { Price, stateName } = enums;
     const name = stateName(code);
-    const slug = stateSlug(code);
+    const slug = stateSlug(enums, code);
     const urlFor = (n) => `${SITE_URL}/pages/states/${pageFileName(slug, n)}`;
     const sorted = sortShops(shops);
     const total = sorted.length;
@@ -261,12 +292,12 @@ ${list}
 
 /** Index of all states with real shop counts. */
 function renderIndexPage(enums, results) {
-    const { stateName, stateSlug } = enums;
+    const { stateName } = enums;
     const rows = results
         .slice()
         .sort((a, b) => stateName(a.code).localeCompare(stateName(b.code)))
         .map(({ code, shops }) => `            <li class="coffee-item">
-                <h3><a href="/pages/states/${stateSlug(code)}.html">${escapeHtml(stateName(code))}</a></h3>
+                <h3><a href="/pages/states/${stateSlug(enums, code)}.html">${escapeHtml(stateName(code))}</a></h3>
                 <p>${shops.length} coffee shop${shops.length === 1 ? '' : 's'}</p>
             </li>`)
         .join('\n');
@@ -343,9 +374,9 @@ async function mapWithConcurrency(items, limit, task) {
 }
 
 async function main({ env = process.env, fetchImpl = fetch, outDir = OUT_DIR, log = console } = {}) {
-    const apiBase = resolveApiBase(env);
-    if (!apiBase || !/^https?:\/\//.test(apiBase)) {
-        log.warn(`⚠️  Skipping state prerender: API_BASE_URL is ${apiBase ? `"${apiBase}"` : 'unset'} (needs an absolute http(s) URL).`);
+    const { apiBase, skip } = resolveApiTarget(env);
+    if (skip) {
+        log.warn(`⚠️  Skipping state prerender: ${skip}. State pages will be missing from this build.`);
         return { skipped: true };
     }
 
@@ -376,7 +407,8 @@ async function main({ env = process.env, fetchImpl = fetch, outDir = OUT_DIR, lo
 
 module.exports = {
     loadEnums,
-    resolveApiBase,
+    resolveApiTarget,
+    stateSlug,
     escapeHtml,
     priceRangeSymbol,
     buildJsonLd,

@@ -10,7 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import enums from '../../public/enums.js';
 
-const { stateName, stateCodeFromName, isStateCode, allStateCodes, allStates, stateSlug, Price } = enums;
+const { stateName, stateCodeFromName, isStateCode, allStateCodes, allStates, Price } = enums;
 
 describe('State helpers', () => {
   describe('stateName(code)', () => {
@@ -121,30 +121,6 @@ describe('State helpers', () => {
       const states = allStates();
       expect(Object.isFrozen(states)).toBe(true);
       expect(Object.isFrozen(states[0])).toBe(true);
-    });
-  });
-
-  describe('stateSlug(code)', () => {
-    it('lowercases and hyphenates the state name', () => {
-      expect(stateSlug('CA')).toBe('california');
-      expect(stateSlug('NY')).toBe('new-york');
-      expect(stateSlug('nc')).toBe('north-carolina');
-    });
-
-    it('collapses punctuation in names like "Washington D.C."', () => {
-      expect(stateSlug('DC')).toBe('washington-d-c');
-    });
-
-    it('returns null for unknown or non-string codes', () => {
-      expect(stateSlug('XX')).toBe(null);
-      expect(stateSlug(null)).toBe(null);
-      expect(stateSlug(42)).toBe(null);
-    });
-
-    it('gives every state a unique, URL-safe slug', () => {
-      const slugs = allStateCodes().map(stateSlug);
-      expect(new Set(slugs).size).toBe(slugs.length);
-      for (const slug of slugs) expect(slug).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);
     });
   });
 });

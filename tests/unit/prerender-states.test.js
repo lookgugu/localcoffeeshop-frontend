@@ -15,7 +15,7 @@ import { join } from 'node:path';
 
 const require = createRequire(import.meta.url);
 const prerender = require('../../scripts/prerender-states.cjs');
-const { fetchStateShops, renderStatePages, renderIndexPage, pageFileName, main } = prerender;
+const { fetchStateShops, renderStatePages, renderIndexPage, pageFileName, resolveApiTarget, stateSlug, main } = prerender;
 
 const enums = prerender.loadEnums();
 const API = 'https://api.example.test/api/v1';
@@ -48,6 +48,50 @@ function pagedApi(byState, { pageLimitCap = 500 } = {}) {
 
 const jsonLdOf = (html) =>
   JSON.parse(html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1]);
+
+describe('stateSlug', () => {
+  it('lowercases and hyphenates the state name', () => {
+    expect(stateSlug(enums, 'CA')).toBe('california');
+    expect(stateSlug(enums, 'NY')).toBe('new-york');
+    expect(stateSlug(enums, 'nc')).toBe('north-carolina');
+  });
+
+  it('collapses punctuation in names like "Washington D.C."', () => {
+    expect(stateSlug(enums, 'DC')).toBe('washington-d-c');
+  });
+
+  it('returns null for unknown or non-string codes', () => {
+    expect(stateSlug(enums, 'XX')).toBe(null);
+    expect(stateSlug(enums, null)).toBe(null);
+  });
+
+  it('gives every state a unique, URL-safe slug', () => {
+    const slugs = enums.allStateCodes().map((c) => stateSlug(enums, c));
+    expect(new Set(slugs).size).toBe(slugs.length);
+    for (const slug of slugs) expect(slug).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);
+  });
+});
+
+describe('resolveApiTarget', () => {
+  it('uses an absolute API_BASE_URL as-is, minus trailing slashes', () => {
+    expect(resolveApiTarget({ API_BASE_URL: 'https://api.example.test/api/v1/' }))
+      .toEqual({ apiBase: 'https://api.example.test/api/v1' });
+  });
+
+  it('resolves a relative base against the site URL on Netlify (same-origin API)', () => {
+    expect(resolveApiTarget({ NETLIFY: 'true', URL: 'https://localcoffeeshop.co', API_BASE_URL: '/api/v1' }))
+      .toEqual({ apiBase: 'https://localcoffeeshop.co/api/v1' });
+  });
+
+  it('defaults to /api/v1 like api-client.js when unset on Netlify', () => {
+    expect(resolveApiTarget({ NETLIFY: 'true', URL: 'https://preview--site.netlify.app' }))
+      .toEqual({ apiBase: 'https://preview--site.netlify.app/api/v1' });
+  });
+
+  it('skips local builds that only have a relative base', () => {
+    expect(resolveApiTarget({ API_BASE_URL: '/api/v1' }).skip).toMatch(/relative/);
+  });
+});
 
 describe('fetchStateShops', () => {
   it('follows pagination until hasNext is false', async () => {
@@ -223,6 +267,19 @@ describe('main (build step)', () => {
     expect(result.skipped).toBe(true);
     expect(fetchImpl).not.toHaveBeenCalled();
     expect(log.warn).toHaveBeenCalledWith(expect.stringContaining('Skipping state prerender'));
+    expect(readdirSync(outDir)).toEqual(['previous.html']);
+  });
+
+  it('never skips on Netlify: a relative base is fetched from the site, and failures fail the build', async () => {
+    const fetchImpl = vi.fn(async () => new Response('not found', { status: 404 }));
+
+    await expect(main({
+      env: { NETLIFY: 'true', URL: 'https://localcoffeeshop.co', API_BASE_URL: '/api/v1' },
+      fetchImpl, outDir, log,
+    })).rejects.toThrow(/HTTP 404/);
+
+    expect(fetchImpl.mock.calls[0][0]).toMatch(/^https:\/\/localcoffeeshop\.co\/api\/v1\/states\//);
+    expect(log.warn).not.toHaveBeenCalled();
     expect(readdirSync(outDir)).toEqual(['previous.html']);
   });
 

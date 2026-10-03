@@ -17,6 +17,9 @@ import enums from '../../../public/enums.js';
 import skeleton from '../../../public/skeleton.js';
 import storeMod from '../../../public/store.js';
 import api from '../../../public/api-client.js';
+import { createRequire } from 'node:module';
+
+const { stateSlug } = createRequire(import.meta.url)('../../../scripts/prerender-states.cjs');
 
 function mountDom() {
   // Build the minimal DOM scaffold the page expects.
@@ -122,20 +125,28 @@ describe('state.js — invalid API response shape', () => {
     expect(document.querySelector('#coffeeList .coffee-item h3')?.textContent).toBe('Cafe Test');
   });
 
-  it('points its canonical link and JSON-LD at the prerendered static page', async () => {
-    Object.defineProperty(document, 'readyState', { configurable: true, value: 'complete' });
-    server.use(
-      http.get('*/api/v1/config', () => HttpResponse.json({ success: true, data: { frontendUrl: 'http://localhost' } })),
-      http.get('*/api/v1/states/CA', () => HttpResponse.json({ success: true, data: [] }))
-    );
+  // Same slug function the build uses to name the files; the two must agree
+  it.each(['CA', 'NY', 'DC', 'PR', 'NC'])(
+    'points canonical link and JSON-LD for %s at the prerendered static page',
+    async (code) => {
+      Object.defineProperty(document, 'readyState', { configurable: true, value: 'complete' });
+      Object.defineProperty(window, 'location', {
+        value: new URL(`http://localhost/html/state.html?code=${code}`),
+        writable: true,
+      });
+      server.use(
+        http.get('*/api/v1/config', () => HttpResponse.json({ success: true, data: { frontendUrl: 'http://localhost' } })),
+        http.get(`*/api/v1/states/${code}`, () => HttpResponse.json({ success: true, data: [] }))
+      );
 
-    vi.resetModules();
-    await import('../../../public/html/state.js');
-    await new Promise((r) => setTimeout(r, 100));
+      vi.resetModules();
+      await import('../../../public/html/state.js');
+      await new Promise((r) => setTimeout(r, 100));
 
-    const staticPage = 'http://localhost/pages/states/california.html';
-    expect(document.getElementById('canonicalUrl').getAttribute('href')).toBe(staticPage);
-    const jsonLd = JSON.parse(document.getElementById('stateJsonLd').textContent);
-    expect(jsonLd['@graph'][1]['@id']).toBe(staticPage);
-  });
+      const staticPage = `http://localhost/pages/states/${stateSlug(enums, code)}.html`;
+      expect(document.getElementById('canonicalUrl').getAttribute('href')).toBe(staticPage);
+      const jsonLd = JSON.parse(document.getElementById('stateJsonLd').textContent);
+      expect(jsonLd['@graph'][1]['@id']).toBe(staticPage);
+    }
+  );
 });

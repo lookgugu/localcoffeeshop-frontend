@@ -18,7 +18,7 @@ if (!window.ApiClient) {
 if (!window.CoffeeShopStore) {
     throw new Error('window.CoffeeShopStore not loaded — check script order in HTML');
 }
-const { stateName, isStateCode, stateSlug, Price } = window.CoffeeShopEnums;
+const { stateName, isStateCode, Price } = window.CoffeeShopEnums;
 const { createSkeletonItem } = window.CoffeeShopSkeleton;
 const api = window.ApiClient;
 const { createStore } = window.CoffeeShopStore;
@@ -132,6 +132,21 @@ function updateMetaTags(stateName, stateCode) {
 
 // Frontend base URL for meta tags and canonical URLs
 let frontendBaseUrl = window.location.origin;
+
+/**
+ * Slug for a state's static page: 'NY' -> 'new-york', 'DC' -> 'washington-d-c'.
+ * Must match stateSlug() in scripts/prerender-states.cjs, which writes the
+ * pages (a test checks they agree). Not in enums.js, which has to stay
+ * identical to the backend repo's copy.
+ * @param {string} stateCode - Two-letter state code (e.g. "CA")
+ * @returns {string}
+ */
+function stateSlug(stateCode) {
+    return stateName(stateCode)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+}
 
 /**
  * Canonical URL for a state: the build-time prerendered static page, which
