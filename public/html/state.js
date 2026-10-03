@@ -31,7 +31,10 @@ const PAGE_SIZE = 100;
 
 // Per-page store (ADR-0001): the state-detail view's reactive surface.
 //   - shops:         the loaded shops rendered into <ul id="coffeeList"> (null = unloaded)
-//   - pagination:    { page, total, hasNext } for what has been loaded (null = unloaded)
+//   - pagination:    { page, total, hasNext, rejected } for what has been loaded
+//                    (null = unloaded). `total` is the displayed total: the
+//                    server count minus `rejected` (duplicates skipped across
+//                    pages), or exactly the loaded count once there are no more pages.
 //   - loading:       skeleton-loading toggle (first page)
 //   - loadingMore:   a "Load more" request is in flight
 //   - error:         user-facing error message for the first page (null when no error)
@@ -439,6 +442,17 @@ async function fetchShopsPage(stateCode, page) {
 }
 
 /**
+ * Total to display. The server's count includes records we skip as
+ * duplicates across pages, so subtract those; once there are no more pages
+ * the total is exactly what was loaded, so the final state never shows a
+ * phantom remainder.
+ */
+function reconcileTotal(serverTotal, rejected, loaded, hasNext) {
+    if (!hasNext) return loaded;
+    return Math.max(serverTotal - rejected, loaded);
+}
+
+/**
  * Fetch the first page of coffee shops for `stateCode`, pushing results into
  * the store. Renderers react via subscribers.
  */
@@ -454,7 +468,11 @@ async function loadStateShops(stateCode) {
         store.set('loading', false);
         // Pagination first: renderSummary/renderLoadMore run on each write and
         // need both keys; the 'shops' write is the one that renders the list.
-        store.set('pagination', pagination);
+        store.set('pagination', {
+            ...pagination,
+            total: reconcileTotal(pagination.total, 0, shops.length, pagination.hasNext),
+            rejected: 0
+        });
         store.set('shops', shops);
     } catch (err) {
         console.error('Error loading coffee shops:', err);
@@ -477,10 +495,19 @@ async function loadMoreShops() {
     try {
         const next = await fetchShopsPage(currentStateCode, pagination.page + 1);
         // Skip shops already loaded (data can shift between page requests).
-        const seen = new Set((store.get('shops') || []).map(s => s.id).filter(id => id != null));
+        const loaded = store.get('shops') || [];
+        const seen = new Set(loaded.map(s => s.id).filter(id => id != null));
         const fresh = next.shops.filter(s => s.id == null || !seen.has(s.id));
+        // Duplicates were counted in the server total but won't be shown.
+        const rejected = (pagination.rejected || 0) + (next.shops.length - fresh.length);
+        const hasNext = next.pagination.hasNext && next.shops.length > 0;
 
-        store.set('pagination', next.pagination);
+        store.set('pagination', {
+            ...next.pagination,
+            hasNext,
+            rejected,
+            total: reconcileTotal(next.pagination.total, rejected, loaded.length + fresh.length, hasNext)
+        });
         store.update('shops', prev => (prev || []).concat(fresh));
 
         // Move focus to the first newly loaded shop so keyboard and screen

@@ -296,6 +296,71 @@ describe('frontend.js — search pagination (#16)', () => {
     expect(new Set(names).size).toBe(names.length);
   });
 
+  /** /search handler with a custom slice per page and a fixed server-reported total. */
+  function customSearchHandler(slices, total) {
+    return http.get('*/api/v1/search', ({ request }) => {
+      const page = Number(new URL(request.url).searchParams.get('page') || 1);
+      requests.push({ page });
+      const totalPages = slices.length;
+      return HttpResponse.json({
+        success: true,
+        data: slices[page - 1] || [],
+        metadata: { pagination: { page, limit: 100, total, totalPages, hasNext: page < totalPages, hasPrev: page > 1 } },
+      });
+    });
+  }
+
+  const invalid = (id) => ({ id, displayName: null, formattedAddress: 'nowhere', state: 'TX' });
+
+  it('subtracts invalid records from the total on a single page (no phantom remainder)', async () => {
+    const page1 = makeShops(99);
+    page1.splice(40, 0, invalid(1000)); // 100 records, 1 invalid
+    await boot(customSearchHandler([page1], 100));
+
+    await waitFor(() => expect(results()).toHaveLength(50));
+    expect(resultCount().textContent).toBe('Showing 50 of 99');
+    click(loadMore());
+    await waitFor(() => expect(results()).toHaveLength(99));
+    expect(resultCount().textContent).toBe('99 found');
+    expect(loadMore()).toBeNull();
+  });
+
+  it('subtracts invalid records on later pages and ends consistent on the last page', async () => {
+    const all = makeShops(230);
+    const page2 = all.slice(100, 200);
+    page2[10] = invalid(2000);
+    page2[20] = invalid(2001);
+    await boot(customSearchHandler([all.slice(0, 100), page2, all.slice(200, 230)], 230));
+    await waitFor(() => expect(results()).toHaveLength(50));
+    expect(resultCount().textContent).toBe('Showing 50 of 230');
+
+    click(loadMore());
+    await waitFor(() => expect(results()).toHaveLength(100));
+    click(loadMore()); // page 2: 98 valid
+    await waitFor(() => expect(results()).toHaveLength(150));
+    expect(resultCount().textContent).toBe('Showing 150 of 228');
+
+    click(loadMore());
+    await waitFor(() => expect(results()).toHaveLength(198));
+    click(loadMore()); // page 3
+    await waitFor(() => expect(results()).toHaveLength(228));
+    expect(resultCount().textContent).toBe('228 found');
+    expect(loadMore()).toBeNull();
+  });
+
+  it('uses the loaded count as the total on the last page, even if the server total overstates it', async () => {
+    const all = makeShops(130);
+    await boot(customSearchHandler([all.slice(0, 100), all.slice(100, 130)], 140));
+    await waitFor(() => expect(results()).toHaveLength(50));
+    expect(resultCount().textContent).toBe('Showing 50 of 140');
+    click(loadMore());
+    await waitFor(() => expect(results()).toHaveLength(100));
+    click(loadMore());
+    await waitFor(() => expect(results()).toHaveLength(130));
+    expect(resultCount().textContent).toBe('130 found');
+    expect(loadMore()).toBeNull();
+  });
+
   it('falls back to a single page when an older cached ApiClient ignores withMeta', async () => {
     // Old ApiClient: get() returns the bare data array whatever the options.
     window.ApiClient = { ...api, get: (path, opts) => api.get(path, { ...opts, withMeta: false }) };

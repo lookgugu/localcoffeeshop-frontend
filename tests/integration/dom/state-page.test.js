@@ -336,6 +336,57 @@ describe('state.js — pagination (#16)', () => {
     expect(controls === null || controls.hidden).toBe(true);
   });
 
+  /** Handler with a custom slice per page and a fixed server-reported total. */
+  function customPagesHandler(slices, total) {
+    return http.get('*/api/v1/states/CA', ({ request }) => {
+      const page = Number(new URL(request.url).searchParams.get('page') || 1);
+      requests.push({ page });
+      const totalPages = slices.length;
+      return HttpResponse.json({
+        success: true,
+        data: slices[page - 1] || [],
+        metadata: { pagination: { page, limit: 100, total, totalPages, hasNext: page < totalPages, hasPrev: page > 1 } },
+      });
+    });
+  }
+
+  it('subtracts duplicates skipped across pages from the total and ends on "Showing all N"', async () => {
+    const all = makeShops(250);
+    // Page 2 starts 10 rows early (rows shifted), so 10 of its shops are duplicates.
+    await boot(customPagesHandler([all.slice(0, 100), all.slice(90, 190), all.slice(190, 250)], 250));
+    await waitFor(() => expect(items()).toHaveLength(100));
+
+    loadMoreButton().click();
+    await waitFor(() => expect(items()).toHaveLength(190));
+    expect(document.getElementById('totalShops').textContent).toBe('240');
+    expect(document.getElementById('shopListStatus').textContent).toBe('Showing 190 of 240 coffee shops');
+    expect(loadMoreButton().textContent).toBe('Load more (50 remaining)');
+
+    // Last page: 60 new shops. Whatever the running estimate said, the final
+    // total is exactly what was loaded.
+    loadMoreButton().click();
+    await waitFor(() => expect(items()).toHaveLength(250));
+    expect(document.getElementById('totalShops').textContent).toBe('250');
+    expect(document.getElementById('shopListStatus').textContent).toBe('Showing all 250 coffee shops');
+    expect(document.getElementById('avgPrice').textContent).not.toMatch(/loaded/);
+    expect(loadMoreButton().hidden).toBe(true);
+  });
+
+  it('uses the loaded count as the total once the last page arrives, even if the server total overstates it', async () => {
+    const all = makeShops(250);
+    await boot(customPagesHandler([all.slice(0, 100), all.slice(100, 200), all.slice(200, 250)], 260));
+    await waitFor(() => expect(items()).toHaveLength(100));
+    expect(document.getElementById('totalShops').textContent).toBe('260');
+
+    loadMoreButton().click();
+    await waitFor(() => expect(items()).toHaveLength(200));
+    loadMoreButton().click();
+    await waitFor(() => expect(items()).toHaveLength(250));
+    expect(document.getElementById('totalShops').textContent).toBe('250');
+    expect(document.getElementById('shopListStatus').textContent).toBe('Showing all 250 coffee shops');
+    expect(document.getElementById('avgPrice').textContent).not.toMatch(/loaded/);
+  });
+
   it('falls back to a single page when an older cached ApiClient ignores withMeta', async () => {
     // Old ApiClient: get() returns the bare data array whatever the options.
     window.ApiClient = { ...api, get: (path, opts) => api.get(path, { ...opts, withMeta: false }) };

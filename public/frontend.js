@@ -54,16 +54,22 @@
     // subscribe per-key; mutations go through store.update / store.set.
     //   - availableStates: index of state codes/counts shown on the grid
     //   - lastSearchResults: most recent search result, null before the first
-    //     search: { shops, total, page, hasNext, query } where `shops` is the
-    //     first API page, `total`/`hasNext` come from the API's pagination
-    //     metadata and `query` is the search that produced it.
+    //     search: { shops, total, page, hasNext, rejected, query } where
+    //     `shops` is the first API page (valid shops only), `total`/`hasNext`
+    //     come from the API's pagination metadata, `rejected` counts invalid
+    //     records dropped from the page and `query` is the search that
+    //     produced it.
     //   - loadMoreState: pagination cursor for the search-results list:
     //     every shop fetched so far, how many are rendered, and the API
     //     cursor (page, hasNext, total, query) plus an in-flight flag.
+    //     `total` is the displayed total: the server count minus `rejected`
+    //     (invalid + duplicate records), or exactly the loaded count once
+    //     there are no more pages.
     const EMPTY_LOAD_MORE_STATE = Object.freeze({
         shops: [],
         currentlyShowing: 0,
         total: 0,
+        rejected: 0,
         page: 0,
         hasNext: false,
         query: null,
@@ -327,6 +333,7 @@
     function displayResults(results) {
         if (!dom.searchResultsContainer || results == null) return;
         const { shops, total, page, hasNext, query } = results;
+        const rejected = results.rejected || 0;
 
         dom.searchResultsContainer.replaceChildren();
         resultsElements.length = 0;
@@ -367,7 +374,8 @@
         store.set('loadMoreState', {
             shops,
             currentlyShowing: shopsToRender.length,
-            total: Math.max(total, shops.length),
+            total: reconcileTotal(total, rejected, shops.length, hasNext),
+            rejected,
             page,
             hasNext,
             query,
@@ -377,6 +385,17 @@
         // Move focus to results for screen reader users
         dom.searchResultsContainer.setAttribute('tabindex', '-1');
         dom.searchResultsContainer.focus();
+    }
+
+    /**
+     * Total to display for a result set. The server's count includes records
+     * we drop (invalid shape, duplicates across pages), so subtract those; and
+     * once there are no more pages the total is exactly what was loaded, so
+     * the final state never shows a phantom remainder.
+     */
+    function reconcileTotal(serverTotal, rejected, loaded, hasNext) {
+        if (!hasNext) return loaded;
+        return Math.max(serverTotal - rejected, loaded);
     }
 
     /** Format a count for display: 2560 -> "2,560". */
@@ -457,13 +476,19 @@
                 // Skip shops already fetched (data can shift between page requests).
                 const seen = new Set(prev.shops.map(s => s.id).filter(id => id != null));
                 const fresh = next.shops.filter(s => s.id == null || !seen.has(s.id));
+                const shops = prev.shops.concat(fresh);
+                // Records the server counted but we won't show: invalid ones
+                // (dropped in fetchSearchPage) plus duplicates skipped here.
+                const rejected = prev.rejected + next.rejected + (next.shops.length - fresh.length);
+                // An empty page can't make progress; stop offering more.
+                const hasMorePages = next.hasNext && (next.shops.length + next.rejected) > 0;
                 return {
                     ...prev,
-                    shops: prev.shops.concat(fresh),
+                    shops,
                     page: next.page,
-                    // An empty page can't make progress; stop offering more.
-                    hasNext: next.hasNext && next.shops.length > 0,
-                    total: Math.max(next.total, prev.shops.length + fresh.length),
+                    hasNext: hasMorePages,
+                    total: reconcileTotal(next.total, rejected, shops.length, hasMorePages),
+                    rejected,
                     loading: false
                 };
             });
@@ -617,11 +642,13 @@
 
         // Filter out invalid shop entries
         const shops = data.filter(isValidShop);
+        // How many records the server sent (and counted in its total) that we dropped.
+        const rejected = data.length - shops.length;
         const p = metadata && metadata.pagination;
         if (p && typeof p.total === 'number') {
-            return { shops, total: p.total, page: p.page || page, hasNext: Boolean(p.hasNext) };
+            return { shops, total: p.total, page: p.page || page, hasNext: Boolean(p.hasNext), rejected };
         }
-        return { shops, total: shops.length, page, hasNext: false };
+        return { shops, total: shops.length, page, hasNext: false, rejected };
     }
 
     async function searchCoffeeShops() {
