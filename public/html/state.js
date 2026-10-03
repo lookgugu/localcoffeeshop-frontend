@@ -419,10 +419,15 @@ let currentStateCode = null;
  * as the whole list.
  */
 async function fetchShopsPage(stateCode, page) {
-    const { data, metadata } = await api.get(`/states/${stateCode}`, {
+    const result = await api.get(`/states/${stateCode}`, {
         query: { page, limit: PAGE_SIZE },
         withMeta: true
     });
+    // An older cached ApiClient (pre-withMeta) returns the bare array; treat
+    // that as a single page with no pagination metadata.
+    const { data, metadata } = Array.isArray(result)
+        ? { data: result, metadata: null }
+        : (result || {});
     if (!Array.isArray(data)) {
         throw new Error('Invalid data format received from API');
     }

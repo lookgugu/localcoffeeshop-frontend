@@ -336,6 +336,19 @@ describe('state.js — pagination (#16)', () => {
     expect(controls === null || controls.hidden).toBe(true);
   });
 
+  it('falls back to a single page when an older cached ApiClient ignores withMeta', async () => {
+    // Old ApiClient: get() returns the bare data array whatever the options.
+    window.ApiClient = { ...api, get: (path, opts) => api.get(path, { ...opts, withMeta: false }) };
+    await boot(pagedStateHandler(makeShops(250), requests));
+
+    await waitFor(() => expect(items()).toHaveLength(100));
+    expect(document.getElementById('totalShops').textContent).toBe('100');
+    expect(document.getElementById('avgPrice').textContent).not.toMatch(/loaded/);
+    const controls = document.getElementById('loadMoreControls');
+    expect(controls === null || controls.hidden).toBe(true);
+    expect(document.getElementById('coffeeList').textContent).not.toMatch(/error/i);
+  });
+
   it('shows the empty state when the state has no shops', async () => {
     await boot(pagedStateHandler([], requests));
     await waitFor(() => expect(document.getElementById('coffeeList').textContent)

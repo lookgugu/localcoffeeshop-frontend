@@ -453,15 +453,20 @@
                 return;
             }
             if (store.get('loadMoreState').query !== query) return;
-            store.update('loadMoreState', prev => ({
-                ...prev,
-                shops: prev.shops.concat(next.shops),
-                page: next.page,
-                // An empty page can't make progress; stop offering more.
-                hasNext: next.hasNext && next.shops.length > 0,
-                total: Math.max(next.total, prev.shops.length + next.shops.length),
-                loading: false
-            }));
+            store.update('loadMoreState', prev => {
+                // Skip shops already fetched (data can shift between page requests).
+                const seen = new Set(prev.shops.map(s => s.id).filter(id => id != null));
+                const fresh = next.shops.filter(s => s.id == null || !seen.has(s.id));
+                return {
+                    ...prev,
+                    shops: prev.shops.concat(fresh),
+                    page: next.page,
+                    // An empty page can't make progress; stop offering more.
+                    hasNext: next.hasNext && next.shops.length > 0,
+                    total: Math.max(next.total, prev.shops.length + fresh.length),
+                    loading: false
+                };
+            });
             state = store.get('loadMoreState');
             if (state.currentlyShowing >= state.shops.length) return;
         }
@@ -596,10 +601,15 @@
      * API's pagination metadata (a response without it is a single page).
      */
     async function fetchSearchPage(query, page) {
-        const { data, metadata } = await api.get('/search', {
+        const result = await api.get('/search', {
             query: { ...query, page, limit: CONSTANTS.SEARCH_API_PAGE_SIZE },
             withMeta: true,
         });
+        // An older cached ApiClient (pre-withMeta) returns the bare array;
+        // treat that as a single page with no pagination metadata.
+        const { data, metadata } = Array.isArray(result)
+            ? { data: result, metadata: null }
+            : (result || {});
 
         if (!Array.isArray(data)) {
             throw new Error('Invalid data format: expected array');

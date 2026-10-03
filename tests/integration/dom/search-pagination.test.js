@@ -266,6 +266,50 @@ describe('frontend.js — search pagination (#16)', () => {
     expect(loadMore()).toBeNull();
   });
 
+  it('skips shops already fetched when the next page overlaps (data shifted between requests)', async () => {
+    const all = makeShops(230);
+    server.use(
+      http.get('*/api/v1/health', () => HttpResponse.json({ success: true, data: { status: 'ok' } })),
+      http.get('*/api/v1/search', ({ request }) => {
+        const page = Number(new URL(request.url).searchParams.get('page') || 1);
+        requests.push({ page });
+        // Page 2 starts 10 rows early, as if 10 rows were inserted before it.
+        const data = page === 1 ? all.slice(0, 100) : all.slice(90, 190);
+        return HttpResponse.json({
+          success: true,
+          data,
+          metadata: { pagination: { page, limit: 100, total: 230, totalPages: 3, hasNext: page < 3, hasPrev: page > 1 } },
+        });
+      })
+    );
+    vi.resetModules();
+    await import('../../../public/frontend.js');
+
+    await waitFor(() => expect(results()).toHaveLength(50));
+    click(loadMore());
+    await waitFor(() => expect(results()).toHaveLength(100));
+    click(loadMore()); // fetches page 2 (shops 91-190; 91-100 are duplicates)
+    await waitFor(() => expect(results()).toHaveLength(150));
+
+    const names = [...results()].map((li) => li.querySelector('h3').textContent);
+    expect(names[100]).toBe('Shop 101');
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it('falls back to a single page when an older cached ApiClient ignores withMeta', async () => {
+    // Old ApiClient: get() returns the bare data array whatever the options.
+    window.ApiClient = { ...api, get: (path, opts) => api.get(path, { ...opts, withMeta: false }) };
+    await boot(pagedSearchHandler(makeShops(2560), requests));
+
+    await waitFor(() => expect(results()).toHaveLength(50));
+    expect(resultCount().textContent).toBe('Showing 50 of 100');
+    click(loadMore());
+    await waitFor(() => expect(results()).toHaveLength(100));
+    expect(resultCount().textContent).toBe('100 found');
+    expect(loadMore()).toBeNull();
+    expect(requests).toHaveLength(1);
+  });
+
   it('a response without pagination metadata is treated as the full result set', async () => {
     // Default mockApi handler: 7 shops, no metadata.
     server.use(http.get('*/api/v1/health', () => HttpResponse.json({ success: true, data: { status: 'ok' } })));
