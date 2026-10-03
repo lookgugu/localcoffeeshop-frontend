@@ -91,8 +91,8 @@ function internalRefs(file, pageUrl) {
   const isHtml = file.endsWith('.html');
   const patterns = isHtml
     ? [/\b(?:href|src)=["']([^"'\s]+)["']/g]
-    // JS: link targets set via `href: '...'`, `.href = '...'` or markup strings
-    : [/\bhref\s*[:=]\s*['"`](\/[^'"`\s]*)/g, /\b(?:href|src)=\\?["'](\/[^"'\\\s]*)/g];
+    // JS: targets set via `href: '...'`, `.href = '...'`, `.src = '...'` or markup strings
+    : [/\b(?:href|src)\s*[:=]\s*['"`](\/[^'"`\s]*)/g, /\b(?:href|src)=\\?["'](\/[^"'\\\s]*)/g];
   const refs = [];
   for (const pattern of patterns) {
     for (const [, url] of text.matchAll(pattern)) {
@@ -121,6 +121,12 @@ describe('internal links', () => {
     expect(deployedUrls(index)).toEqual(['/html/index.html', '/']);
     const fromRoot = internalRefs(index, '/');
     expect(fromRoot).toEqual(expect.arrayContaining([{ ref: 'submit.html', path: '/submit.html' }]));
+  });
+
+  it('checks URLs that JS assigns to src, e.g. injected scripts', () => {
+    const loader = join(PUBLIC, 'asset-loader.js');
+    expect(internalRefs(loader, '/asset-loader.js'))
+      .toEqual(expect.arrayContaining([{ ref: '/consent-banner.js', path: '/consent-banner.js' }]));
   });
 
   it('resolve to files the deployed site serves', () => {
