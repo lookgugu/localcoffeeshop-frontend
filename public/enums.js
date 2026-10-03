@@ -77,6 +77,20 @@
   function allStateCodes() { return _CODES_SORTED; }
   function allStates() { return _STATES_SORTED_BY_NAME; }
 
+  /**
+   * URL slug for a state's static page (/pages/states/{slug}.html), e.g.
+   * 'NY' -> 'new-york', 'DC' -> 'washington-d-c'. Shared by the build-time
+   * prerender script and the dynamic page's canonical link so they agree.
+   * Returns null for unknown codes.
+   */
+  function stateSlug(code) {
+    if (!isStateCode(code)) return null;
+    return STATE_NAMES[code.toUpperCase()]
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
+
   // ==========================================================================
   // PRICE
   // ==========================================================================
@@ -162,6 +176,7 @@
     isStateCode: isStateCode,
     allStateCodes: allStateCodes,
     allStates: allStates,
+    stateSlug: stateSlug,
     Price: Price
   });
 });

@@ -250,3 +250,6 @@ backups/
 
 # Architecture review artifact (lives at project root, outside this repo)
 architecture-review*.html
+
+# State pages are prerendered from the API at build time (scripts/prerender-states.cjs)
+public/pages/states/

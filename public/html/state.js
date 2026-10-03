@@ -18,7 +18,7 @@ if (!window.ApiClient) {
 if (!window.CoffeeShopStore) {
     throw new Error('window.CoffeeShopStore not loaded — check script order in HTML');
 }
-const { stateName, isStateCode, Price } = window.CoffeeShopEnums;
+const { stateName, isStateCode, stateSlug, Price } = window.CoffeeShopEnums;
 const { createSkeletonItem } = window.CoffeeShopSkeleton;
 const api = window.ApiClient;
 const { createStore } = window.CoffeeShopStore;
@@ -101,7 +101,7 @@ function getStateCode() {
  */
 function updateMetaTags(stateName, stateCode) {
     const description = `Discover the best coffee shops in ${stateName}. Browse local cafes, compare prices, and find your next favorite coffee spot.`;
-    const url = `${frontendBaseUrl}/html/state.html?code=${stateCode}`;
+    const url = canonicalStateUrl(stateCode);
     const title = `Coffee Shops in ${stateName}`;
 
     // Update meta description
@@ -132,6 +132,16 @@ function updateMetaTags(stateName, stateCode) {
 
 // Frontend base URL for meta tags and canonical URLs
 let frontendBaseUrl = window.location.origin;
+
+/**
+ * Canonical URL for a state: the build-time prerendered static page, which
+ * carries the same listings and JSON-LD without needing JavaScript.
+ * @param {string} stateCode - Two-letter state code (e.g. "CA")
+ * @returns {string}
+ */
+function canonicalStateUrl(stateCode) {
+    return `${frontendBaseUrl}/pages/states/${stateSlug(stateCode)}.html`;
+}
 
 /**
  * Load backend configuration to get canonical frontend URL
@@ -292,7 +302,7 @@ function priceRangeSymbol(priceLevel) {
  * @param {Array<Object>} shops - loaded shop records (may be empty)
  */
 function injectStructuredData(fullStateName, stateCode, shops) {
-    const pageUrl = `${frontendBaseUrl}/html/state.html?code=${stateCode}`;
+    const pageUrl = canonicalStateUrl(stateCode);
     const list = Array.isArray(shops) ? shops : [];
 
     const itemListElement = list.map((shop, i) => {

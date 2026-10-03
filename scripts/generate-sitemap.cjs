@@ -28,11 +28,16 @@ const urls = [
     { loc: '/pages/states/', changefreq: 'weekly', priority: '0.8' },
 ];
 
-// One entry per state page. Files are served directly from public/pages/states/.
+// One entry per state page. Files are prerendered into public/pages/states/
+// by scripts/prerender-states.cjs; pages marked noindex (states with no
+// listings) are left out so the sitemap only lists pages we want indexed.
 if (fs.existsSync(statesDir)) {
     const stateFiles = fs
         .readdirSync(statesDir)
         .filter((f) => f.endsWith('.html') && f !== 'index.html')
+        .filter((f) => !/<meta name="robots" content="noindex/.test(
+            fs.readFileSync(path.join(statesDir, f), 'utf8'),
+        ))
         .sort();
     for (const file of stateFiles) {
         urls.push({
