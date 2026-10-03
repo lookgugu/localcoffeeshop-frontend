@@ -11,7 +11,7 @@ Vanilla JavaScript frontend with performance optimizations including lazy loadin
 - **Frontend**: Vanilla JavaScript (no frameworks)
 - **Styling**: CSS with custom properties
 - **Build**: Terser (JS minification), CleanCSS (CSS minification)
-- **Deployment**: Netlify
+- **Deployment**: DigitalOcean App Platform (static site, `.do/app-spec.yaml`)
 - **Features**: Service Worker, Google Analytics, SEO optimized
 
 ## Getting Started
