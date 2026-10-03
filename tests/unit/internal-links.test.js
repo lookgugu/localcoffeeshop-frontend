@@ -7,6 +7,7 @@
  * Platform static site (.do/app-spec.yaml): it serves files as-is, and a
  * directory serves its index.html. There are no redirects or extensionless
  * rewrites (netlify.toml is not used), which is how /pages/about broke (#15).
+ * Relative references are resolved from each URL the page is served at.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -64,19 +65,42 @@ function sourceFiles(dir) {
   });
 }
 
-/** Same-site URL paths referenced as links or assets in a file. */
-function internalRefs(file) {
+/**
+ * URLs a source file is served at. build:html copies public/html/*.html to
+ * the site root, so those pages live at two URLs (/html/x.html and /x.html);
+ * relative links must work from both.
+ */
+function deployedUrls(file) {
+  const rel = '/' + relative(PUBLIC, file).split('\\').join('/');
+  const copied = rel.match(/^\/html\/([^/]+\.html)$/);
+  if (!copied) return [rel];
+  return [rel, copied[1] === 'index.html' ? '/' : `/${copied[1]}`];
+}
+
+/** Absolute and relative references that leave the page for another URL. */
+const isExternal = (url) => /^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(url);
+
+/**
+ * Same-site references in a file as [{ ref, path }], where `path` is the
+ * root-relative URL path each reference resolves to from `pageUrl`.
+ * Relative references in JS resolve against whatever page loads the script,
+ * which can't be known statically, so only root-relative ones are checked there.
+ */
+function internalRefs(file, pageUrl) {
   const text = readFileSync(file, 'utf8');
-  const patterns = file.endsWith('.html')
-    ? [/\b(?:href|src)=["'](\/[^"'\s]*)["']/g]
+  const isHtml = file.endsWith('.html');
+  const patterns = isHtml
+    ? [/\b(?:href|src)=["']([^"'\s]+)["']/g]
     // JS: link targets set via `href: '...'`, `.href = '...'` or markup strings
     : [/\bhref\s*[:=]\s*['"`](\/[^'"`\s]*)/g, /\b(?:href|src)=\\?["'](\/[^"'\\\s]*)/g];
-  const refs = new Set();
+  const refs = [];
   for (const pattern of patterns) {
     for (const [, url] of text.matchAll(pattern)) {
-      if (url.startsWith('//')) continue; // protocol-relative = external
-      const path = url.split('${')[0]; // template literal: keep the static prefix
-      if (path) refs.add(path);
+      if (isExternal(url)) continue;
+      const ref = url.split('${')[0]; // template literal: keep the static prefix
+      if (!ref) continue;
+      const path = new URL(ref, `https://site.invalid${pageUrl}`).pathname;
+      refs.push({ ref, path });
     }
   }
   return refs;
@@ -92,16 +116,25 @@ describe('internal links', () => {
     );
   });
 
+  it('checks relative references too, from every URL a page is served at', () => {
+    const index = join(PUBLIC, 'html', 'index.html');
+    expect(deployedUrls(index)).toEqual(['/html/index.html', '/']);
+    const fromRoot = internalRefs(index, '/');
+    expect(fromRoot).toEqual(expect.arrayContaining([{ ref: 'submit.html', path: '/submit.html' }]));
+  });
+
   it('resolve to files the deployed site serves', () => {
     const broken = [];
     for (const file of files) {
-      for (const ref of internalRefs(file)) {
-        if (!servedByDeploy(ref) && !(ref.split(/[?#]/)[0] in KNOWN_BROKEN)) {
-          broken.push(`${relative(ROOT, file)} -> ${ref}`);
+      for (const pageUrl of deployedUrls(file)) {
+        for (const { ref, path } of internalRefs(file, pageUrl)) {
+          if (!servedByDeploy(path) && !(path in KNOWN_BROKEN)) {
+            broken.push(`${relative(ROOT, file)} (served at ${pageUrl}) -> ${ref}`);
+          }
         }
       }
     }
-    expect(broken).toEqual([]);
+    expect([...new Set(broken)]).toEqual([]);
   });
 
   it('allowlists only links that are still broken', () => {
