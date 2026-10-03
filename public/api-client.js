@@ -7,6 +7,9 @@
  * Design contract (see tasks/todo.md, candidate #4):
  *   - HTTP-verb interface: api.get/post/put/delete (path, [body,] opts?)
  *   - Returns the unwrapped `data` from a `{success, data, error}` envelope.
+ *     Opt-in `{withMeta: true}` returns `{data, metadata}` instead, so callers
+ *     of paged endpoints can read `metadata.pagination` (total, hasNext, ...).
+ *     `metadata` is null when the envelope has none.
  *   - Typed errors so callers can branch:
  *       ApiUsageError      synchronous — misuse of the interface
  *       ApiTimeoutError    AbortController fired on our per-attempt timeout
@@ -173,7 +176,16 @@
       throw new ApiEnvelopeError(errMsg, { url, envelope: json });
     }
 
-    return json.data;
+    return json;
+  }
+
+  // Shape the caller sees: bare `data` by default, `{data, metadata}` when
+  // the caller opted in with `withMeta: true`.
+  function _shapeResult(envelope, opts) {
+    const data = envelope ? envelope.data : null;
+    if (!opts.withMeta) return data;
+    const metadata = envelope && envelope.metadata !== undefined ? envelope.metadata : null;
+    return { data, metadata };
   }
 
   // SYNCHRONOUS safety check: a write request that wants retries MUST carry an
@@ -246,9 +258,9 @@
 
       if (response.ok) {
         // 204 No Content — body is empty by spec; envelope parse would throw.
-        if (response.status === 204) return null;
+        if (response.status === 204) return _shapeResult(null, opts);
         // 2xx — parse envelope; an envelope error is NOT retryable.
-        return await _parseEnvelope(response, url);
+        return _shapeResult(await _parseEnvelope(response, url), opts);
       }
 
       // Non-2xx
