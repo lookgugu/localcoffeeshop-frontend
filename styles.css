@@ -811,6 +811,41 @@ body.has-offline-banner {
     outline-offset: 2px;
 }
 
+/* Pagination on prerendered state pages (scripts/prerender-states.cjs) */
+.pagination {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 1rem 0;
+}
+
+.pagination a,
+.pagination [aria-current="page"] {
+    display: inline-block;
+    min-width: 2.5rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    text-align: center;
+    text-decoration: none;
+    color: #333;
+}
+
+.pagination a:hover {
+    background-color: #f2f2f2;
+}
+
+.pagination a:focus-visible {
+    outline: 3px solid #4a7bff;
+    outline-offset: 2px;
+}
+
+.pagination [aria-current="page"] {
+    background-color: #333;
+    border-color: #333;
+    color: white;
+}
+
 /* Enhanced visual feedback for interactive elements */
 
 /* Active/pressed states for buttons */

@@ -1,0 +1,16 @@
+{
+  "name": "Local Coffee Shops",
+  "short_name": "Coffee Shops",
+  "description": "Discover local coffee shops across the United States. Search by name or city, and filter by state and price level.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#2C3E50",
+  "theme_color": "#2C3E50",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any"
+    }
+  ]
+}
