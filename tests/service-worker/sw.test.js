@@ -349,7 +349,7 @@ describe('Service Worker', () => {
     });
 
     it('should not intercept the production API, which is cross-origin', async () => {
-      // netlify.toml sets API_BASE_URL to https://api.localcoffeeshop.co, so
+      // .do/app-spec.yaml sets API_BASE_URL to https://api.localcoffeeshop.co, so
       // in production the network-first branch below never runs. The API
       // tests use a same-origin URL to exercise it as it behaves in local dev.
       const response = await sw.dispatchFetch('https://api.localcoffeeshop.co/api/v1/states');
@@ -492,7 +492,7 @@ describe('Service Worker', () => {
       await sw.dispatchFetch('/dist/app.min.js');
       await sw.terminateWhenIdle();
 
-      // /dist/* is immutable for a year in netlify.toml; a default-mode fetch
+      // /dist/* may be cached long-term by the host/CDN; a default-mode fetch
       // would be answered from the HTTP cache and never see a new deploy
       expect(sw.fetch).toHaveBeenCalledTimes(1);
       expect(sw.fetch.mock.calls[0][1]).toEqual({ cache: 'no-cache' });

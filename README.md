@@ -11,7 +11,7 @@ Vanilla JavaScript frontend with performance optimizations including lazy loadin
 - **Frontend**: Vanilla JavaScript (no frameworks)
 - **Styling**: CSS with custom properties
 - **Build**: Terser (JS minification), CleanCSS (CSS minification)
-- **Deployment**: Netlify
+- **Deployment**: DigitalOcean App Platform (static site, `.do/app-spec.yaml`)
 - **Features**: Service Worker, Google Analytics, SEO optimized
 
 ## Getting Started
@@ -138,23 +138,30 @@ npm test
 
 ## Deployment
 
-### Netlify
+### DigitalOcean App Platform
 
-The app is configured for Netlify deployment via `netlify.toml`.
+Production is a DigitalOcean App Platform **static site** defined in
+`.do/app-spec.yaml` (build `npm run build`, output `public/`). Pushes to
+`main` redeploy automatically (`deploy_on_push`). Edits to the spec file
+itself are not picked up by a push; apply them with
+`doctl apps update <app-id> --spec .do/app-spec.yaml` or in the dashboard.
 
-**Environment Variables (set in Netlify dashboard):**
-- `API_BASE_URL`: `https://api.localcoffeeshop.co/api/v1`
-- `NODE_ENV`: `production`
+Build-time environment variables (`NODE_ENV`, `API_BASE_URL`) are set in the
+spec's `envs`.
 
-**Deploy:**
-```bash
-git push origin main
-# Netlify auto-deploys from main branch
-```
+### Security headers / Content Security Policy
 
-### Custom Domain
+App Platform static sites can't set custom response headers, so the CSP is a
+`<meta http-equiv="Content-Security-Policy">` tag, defined once in
+`scripts/csp.cjs`. **Every HTML page must include it** (copy `CSP_META_TAG`
+and `REFERRER_META_TAG` from `scripts/csp.cjs`, directly after
+`<meta charset>`); the prerendered state pages get it from the template, and
+`tests/unit/csp.test.js` fails for any served page that lacks it. Loading a
+new third-party script, stylesheet, font or API origin means adding it to
+`scripts/csp.cjs` and updating the copies in the pages.
 
-Configure `localcoffeeshop.co` to point to Netlify in your DNS settings.
+A meta tag can't provide `frame-ancestors`, `X-Frame-Options` or
+`X-Content-Type-Options`; see #14 for what that leaves unprotected.
 
 ## Browser Support
 

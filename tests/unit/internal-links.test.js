@@ -6,7 +6,8 @@
  * the deployed site actually serves. Production is a DigitalOcean App
  * Platform static site (.do/app-spec.yaml): it serves files as-is, and a
  * directory serves its index.html. There are no redirects or extensionless
- * rewrites (netlify.toml is not used), which is how /pages/about broke (#15).
+ * rewrites (an old, never-applied netlify.toml was removed in #14), which is
+ * how /pages/about broke (#15).
  * Relative references are resolved from each URL the page is served at.
  */
 
