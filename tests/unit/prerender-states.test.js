@@ -15,7 +15,15 @@ import { join } from 'node:path';
 
 const require = createRequire(import.meta.url);
 const prerender = require('../../scripts/prerender-states.cjs');
-const { fetchStateShops, renderStatePages, renderIndexPage, pageFileName, isDeployBuild, resolveApiTarget, stateSlug, main } = prerender;
+const { fetchStateShops, rateLimitWaitMs, renderStatePages, renderIndexPage, pageFileName, isDeployBuild, resolveApiTarget, stateSlug, main } = prerender;
+
+/** A fake clock whose sleep() advances time instantly, for backoff/rate-limit tests. */
+function fakeClock(start = 1_000_000) {
+  const clock = { t: start, now: () => clock.t, slept: [] };
+  clock.sleep = vi.fn(async (ms) => { clock.slept.push(ms); clock.t += ms; });
+  return clock;
+}
+const quietLog = { log: () => {}, warn: () => {} };
 
 const enums = prerender.loadEnums();
 const API = 'https://api.example.test/api/v1';
@@ -147,21 +155,104 @@ describe('fetchStateShops', () => {
       .rejects.toThrow(/Unexpected response shape/);
   });
 
-  it('retries transient failures before giving up', async () => {
+  it('retries transient failures with exponential backoff', async () => {
+    const clock = fakeClock();
     const fetchImpl = vi.fn()
       .mockRejectedValueOnce(new TypeError('fetch failed'))
       .mockResolvedValueOnce(new Response('busy', { status: 503 }))
       .mockResolvedValueOnce(Response.json({ success: true, data: shops(2) }));
 
-    await expect(fetchStateShops(API, 'CA', { fetchImpl, retries: 2 })).resolves.toHaveLength(2);
+    await expect(fetchStateShops(API, 'CA', { fetchImpl, retries: 2, ...clock })).resolves.toHaveLength(2);
     expect(fetchImpl).toHaveBeenCalledTimes(3);
+    expect(clock.slept).toEqual([1000, 2000]);
   });
 
   it('throws after exhausting retries', async () => {
+    const clock = fakeClock();
     const fetchImpl = vi.fn(async () => new Response('down', { status: 500 }));
 
-    await expect(fetchStateShops(API, 'CA', { fetchImpl, retries: 1 })).rejects.toThrow(/HTTP 500/);
+    await expect(fetchStateShops(API, 'CA', { fetchImpl, retries: 1, ...clock })).rejects.toThrow(/HTTP 500/);
     expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry client errors other than 429', async () => {
+    const clock = fakeClock();
+    const fetchImpl = vi.fn(async () => new Response('nope', { status: 404 }));
+
+    await expect(fetchStateShops(API, 'CA', { fetchImpl, retries: 3, ...clock })).rejects.toThrow(/HTTP 404/);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(clock.slept).toEqual([]);
+  });
+});
+
+describe('rate limiting (HTTP 429)', () => {
+  const tooMany = (headers = {}) => new Response('slow down', { status: 429, headers });
+
+  it('waits for Retry-After seconds, then retries', async () => {
+    const clock = fakeClock();
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(tooMany({ 'Retry-After': '30' }))
+      .mockResolvedValueOnce(Response.json({ success: true, data: shops(1) }));
+
+    await expect(fetchStateShops(API, 'CA', { fetchImpl, ...clock, log: quietLog })).resolves.toHaveLength(1);
+    expect(clock.slept).toEqual([30_000]);
+  });
+
+  it('reads the wait from Retry-After dates, RateLimit-Reset, or a default, capped at 16 minutes', () => {
+    const now = Date.parse('2026-10-08T12:00:00Z');
+    const res = (headers) => new Response('', { status: 429, headers });
+    expect(rateLimitWaitMs(res({ 'Retry-After': '120' }), now)).toBe(120_000);
+    expect(rateLimitWaitMs(res({ 'Retry-After': 'Thu, 08 Oct 2026 12:05:00 GMT' }), now)).toBe(300_000);
+    expect(rateLimitWaitMs(res({ 'RateLimit-Reset': '900' }), now)).toBe(900_000);
+    expect(rateLimitWaitMs(res({}), now)).toBe(60_000);
+    expect(rateLimitWaitMs(res({ 'Retry-After': '86400' }), now)).toBe(16 * 60 * 1000);
+  });
+
+  it('gives up after repeated 429s instead of waiting forever', async () => {
+    const clock = fakeClock();
+    const fetchImpl = vi.fn(async () => tooMany({ 'Retry-After': '1' }));
+
+    await expect(fetchStateShops(API, 'CA', { fetchImpl, ...clock, log: quietLog })).rejects.toThrow(/HTTP 429/);
+    expect(fetchImpl).toHaveBeenCalledTimes(3); // first try + 2 waits
+  });
+
+  it('completes a full build against an API that enforces 100 requests per 15 minutes', async () => {
+    // Simulates #24: ~104 requests per build, origin limit 100/15 min per IP.
+    const clock = fakeClock();
+    const WINDOW = 15 * 60 * 1000;
+    let windowStart = clock.now();
+    let used = 0;
+    const byState = Object.fromEntries(enums.allStateCodes().map((c) => [c, shops(2, c)]));
+    // 26 states with 3 API pages each: 52 + 26 * 2 = 104 requests, like production
+    for (const c of enums.allStateCodes().slice(0, 26)) byState[c] = shops(1500, c);
+    const api = pagedApi(byState);
+    const limitedFetch = vi.fn(async (url, init) => {
+      if (clock.now() - windowStart >= WINDOW) { windowStart = clock.now(); used = 0; }
+      if (used >= 100) {
+        const reset = Math.ceil((windowStart + WINDOW - clock.now()) / 1000);
+        return tooMany({ 'Retry-After': String(reset), 'RateLimit-Reset': String(reset) });
+      }
+      used++;
+      return api(url, init);
+    });
+    const outDir = mkdtempSync(join(tmpdir(), 'prerender-ratelimit-'));
+    const warn = vi.fn();
+    try {
+      await main({
+        env: { NODE_ENV: 'production', API_BASE_URL: API },
+        fetchImpl: limitedFetch, outDir, sleep: clock.sleep, now: clock.now, log: { log: () => {}, warn },
+      });
+      expect(limitedFetch.mock.calls.length).toBeGreaterThan(104); // includes the rejected attempts
+      const files = readdirSync(outDir);
+      expect(files).toContain('index.html');
+      expect(files).toContain('alabama-6.html'); // 1500 shops / 250 per page
+      expect(warn).toHaveBeenCalledWith(expect.stringMatching(/rate limit hit .* pausing all requests/));
+      // Paused once for (most of) the window, not once per worker
+      expect(clock.slept.filter((ms) => ms > 60_000).length).toBeGreaterThanOrEqual(1);
+      expect(clock.now() - 1_000_000).toBeLessThanOrEqual(WINDOW + 60_000);
+    } finally {
+      rmSync(outDir, { recursive: true, force: true });
+    }
   });
 });
 
@@ -330,7 +421,7 @@ describe('main (build step)', () => {
     const fetchImpl = vi.fn(async (url, init) =>
       url.includes('/states/NV?') ? new Response('down', { status: 500 }) : ok(url, init));
 
-    await expect(main({ env: { NODE_ENV: 'production', API_BASE_URL: API }, fetchImpl, outDir, log }))
+    await expect(main({ env: { NODE_ENV: 'production', API_BASE_URL: API }, fetchImpl, outDir, log, ...fakeClock() }))
       .rejects.toThrow(/HTTP 500/);
 
     expect(readdirSync(outDir)).toEqual(['previous.html']);
@@ -339,7 +430,7 @@ describe('main (build step)', () => {
   it('only warns in a local build when the API is unreachable, keeping existing pages', async () => {
     const fetchImpl = vi.fn(async () => { throw new TypeError('fetch failed'); });
 
-    const result = await main({ env: { API_BASE_URL: 'http://localhost:3000/api/v1' }, fetchImpl, outDir, log });
+    const result = await main({ env: { API_BASE_URL: 'http://localhost:3000/api/v1' }, fetchImpl, outDir, log, ...fakeClock() });
 
     expect(result.skipped).toBe(true);
     expect(log.warn).toHaveBeenCalledWith(expect.stringContaining("couldn't fetch from http://localhost:3000/api/v1"));
