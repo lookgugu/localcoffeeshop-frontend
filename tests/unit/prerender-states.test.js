@@ -175,6 +175,24 @@ describe('fetchStateShops', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
+  it('retries when the body stream fails mid-download, but not on malformed JSON', async () => {
+    const clock = fakeClock();
+    const brokenBody = () => ({ ok: true, status: 200, headers: new Headers(),
+      json: () => Promise.reject(new TypeError('terminated')) });
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(brokenBody())
+      .mockResolvedValueOnce(Response.json({ success: true, data: shops(1) }));
+
+    await expect(fetchStateShops(API, 'CA', { fetchImpl, ...clock })).resolves.toHaveLength(1);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(clock.slept).toEqual([1000]);
+
+    const malformed = vi.fn(async () => new Response('{not json', { status: 200 }));
+    await expect(fetchStateShops(API, 'CA', { fetchImpl: malformed, ...fakeClock() }))
+      .rejects.toThrow(/Invalid JSON/);
+    expect(malformed).toHaveBeenCalledTimes(1);
+  });
+
   it('does not retry client errors other than 429', async () => {
     const clock = fakeClock();
     const fetchImpl = vi.fn(async () => new Response('nope', { status: 404 }));

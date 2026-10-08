@@ -373,8 +373,10 @@ function createRateLimitGate() {
 /**
  * Fetch one URL and unwrap the API envelope.
  * - 429: wait until the rate-limit window resets (shared gate), then retry.
- * - 5xx, network errors, timeouts: exponential backoff, then retry.
- * - other 4xx and malformed bodies: fail immediately; retrying won't help.
+ * - 5xx, network errors, timeouts (including while reading the body):
+ *   exponential backoff, then retry.
+ * - other 4xx, malformed JSON and unexpected shapes: fail immediately;
+ *   retrying won't help.
  */
 async function fetchEnvelope(url, {
     fetchImpl, retries, timeoutMs,
@@ -416,7 +418,17 @@ async function fetchEnvelope(url, {
         }
 
         if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
-        const body = await res.json();
+        let body;
+        try {
+            body = await res.json();
+        } catch (err) {
+            // Malformed JSON won't fix itself; a body stream cut off or timed
+            // out mid-download is transient, like a failed request.
+            if (err instanceof SyntaxError) throw new Error(`Invalid JSON from ${url}: ${err.message}`);
+            if (transientRetries >= retries) throw err;
+            await sleep(BACKOFF_BASE_MS * 2 ** transientRetries++);
+            continue;
+        }
         if (!body || body.success !== true || !Array.isArray(body.data)) {
             throw new Error(`Unexpected response shape from ${url}`);
         }
