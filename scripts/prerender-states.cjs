@@ -34,7 +34,14 @@ const SITE_URL = (process.env.SITE_URL || 'https://localcoffeeshop.co').replace(
 
 const CONCURRENCY = 5;
 const TIMEOUT_MS = 10000;
-const RETRIES = 2;
+const RETRIES = 3; // for 5xx, network errors and timeouts
+const BACKOFF_BASE_MS = 1000; // 1s, 2s, 4s between those retries
+// The API allows 100 requests per 15 minutes per IP and a build makes ~104
+// (#24). On HTTP 429 every request pauses until the window resets, per
+// Retry-After / RateLimit-Reset, capped so a bad header can't hang the build.
+const RATE_LIMIT_RETRIES = 2;
+const RATE_LIMIT_DEFAULT_WAIT_MS = 60 * 1000;
+const RATE_LIMIT_MAX_WAIT_MS = 16 * 60 * 1000;
 const PAGE_SIZE = 500; // API maximum
 const MAX_PAGES = 50; // guard against a runaway hasNext
 const SHOPS_PER_PAGE = 250; // keeps the largest states' pages around 100 KB
@@ -336,34 +343,111 @@ ${rows}
 `;
 }
 
-/** Fetch one URL and unwrap the API envelope, with timeout and retries. */
-async function fetchEnvelope(url, { fetchImpl, retries, timeoutMs }) {
-    let lastError;
-    for (let attempt = 0; attempt <= retries; attempt++) {
-        try {
-            const res = await fetchImpl(url, { signal: AbortSignal.timeout(timeoutMs) });
-            if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
-            const body = await res.json();
-            if (!body || body.success !== true || !Array.isArray(body.data)) {
-                throw new Error(`Unexpected response shape from ${url}`);
-            }
-            return body;
-        } catch (err) {
-            lastError = err;
-        }
+const realSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * How long a 429 asks us to wait, in ms: Retry-After (seconds or HTTP date),
+ * else RateLimit-Reset (seconds), else a default. Capped.
+ */
+function rateLimitWaitMs(res, now = Date.now()) {
+    const retryAfter = res.headers.get('retry-after');
+    let ms = NaN;
+    if (retryAfter) {
+        ms = /^\d+$/.test(retryAfter.trim())
+            ? Number(retryAfter) * 1000
+            : Date.parse(retryAfter) - now;
     }
-    throw lastError;
+    if (!(ms >= 0)) {
+        const resetHeader = res.headers.get('ratelimit-reset');
+        const reset = resetHeader === null ? NaN : Number(resetHeader);
+        ms = Number.isFinite(reset) && reset >= 0 ? reset * 1000 : RATE_LIMIT_DEFAULT_WAIT_MS;
+    }
+    return Math.min(Math.max(ms, 0), RATE_LIMIT_MAX_WAIT_MS);
+}
+
+/** Shared by every request in a run, so one 429 pauses them all. */
+function createRateLimitGate() {
+    return { resumeAt: 0 };
+}
+
+/**
+ * Fetch one URL and unwrap the API envelope.
+ * - 429: wait until the rate-limit window resets (shared gate), then retry.
+ * - 5xx, network errors, timeouts (including while reading the body):
+ *   exponential backoff, then retry.
+ * - other 4xx, malformed JSON and unexpected shapes: fail immediately;
+ *   retrying won't help.
+ */
+async function fetchEnvelope(url, {
+    fetchImpl, retries, timeoutMs,
+    sleep = realSleep, now = Date.now, gate = createRateLimitGate(), log = console,
+}) {
+    let transientRetries = 0;
+    let rateLimitRetries = 0;
+    for (;;) {
+        const pause = gate.resumeAt - now();
+        if (pause > 0) await sleep(pause);
+
+        let res;
+        try {
+            res = await fetchImpl(url, { signal: AbortSignal.timeout(timeoutMs) });
+        } catch (err) {
+            // Network error or timeout
+            if (transientRetries >= retries) throw err;
+            await sleep(BACKOFF_BASE_MS * 2 ** transientRetries++);
+            continue;
+        }
+
+        if (res.status === 429) {
+            if (rateLimitRetries++ >= RATE_LIMIT_RETRIES) {
+                throw new Error(`HTTP 429 for ${url} (still rate-limited after ${RATE_LIMIT_RETRIES} waits)`);
+            }
+            const waitMs = rateLimitWaitMs(res, now());
+            const resumeAt = now() + waitMs;
+            if (resumeAt > gate.resumeAt) {
+                gate.resumeAt = resumeAt;
+                log.warn(`⏳ API rate limit hit (HTTP 429); pausing all requests for ${Math.ceil(waitMs / 1000)}s`);
+            }
+            continue;
+        }
+
+        if (res.status >= 500) {
+            if (transientRetries >= retries) throw new Error(`HTTP ${res.status} for ${url}`);
+            await sleep(BACKOFF_BASE_MS * 2 ** transientRetries++);
+            continue;
+        }
+
+        if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+        let body;
+        try {
+            body = await res.json();
+        } catch (err) {
+            // Malformed JSON won't fix itself; a body stream cut off or timed
+            // out mid-download is transient, like a failed request.
+            if (err instanceof SyntaxError) throw new Error(`Invalid JSON from ${url}: ${err.message}`);
+            if (transientRetries >= retries) throw err;
+            await sleep(BACKOFF_BASE_MS * 2 ** transientRetries++);
+            continue;
+        }
+        if (!body || body.success !== true || !Array.isArray(body.data)) {
+            throw new Error(`Unexpected response shape from ${url}`);
+        }
+        return body;
+    }
 }
 
 /**
  * Fetch every shop for a state. The API pages results (default 100, max 500
  * per page) and reports metadata.pagination.hasNext; follow it to the end.
  */
-async function fetchStateShops(apiBase, code, { fetchImpl = fetch, retries = RETRIES, timeoutMs = TIMEOUT_MS } = {}) {
+async function fetchStateShops(apiBase, code, {
+    fetchImpl = fetch, retries = RETRIES, timeoutMs = TIMEOUT_MS,
+    sleep, now, gate, log,
+} = {}) {
     const shops = [];
     for (let page = 1; page <= MAX_PAGES; page++) {
         const url = `${apiBase}/states/${code}?page=${page}&limit=${PAGE_SIZE}`;
-        const body = await fetchEnvelope(url, { fetchImpl, retries, timeoutMs });
+        const body = await fetchEnvelope(url, { fetchImpl, retries, timeoutMs, sleep, now, gate, log });
         shops.push(...body.data);
         if (!body.metadata?.pagination?.hasNext) return shops;
     }
@@ -384,7 +468,10 @@ async function mapWithConcurrency(items, limit, task) {
     return results;
 }
 
-async function main({ env = process.env, fetchImpl = fetch, outDir = OUT_DIR, log = console } = {}) {
+async function main({
+    env = process.env, fetchImpl = fetch, outDir = OUT_DIR, log = console,
+    sleep = realSleep, now = Date.now,
+} = {}) {
     const { apiBase, skip } = resolveApiTarget(env);
     if (skip) {
         log.warn(`⚠️  Skipping state prerender: ${skip}. State pages will be missing from this build.`);
@@ -393,11 +480,12 @@ async function main({ env = process.env, fetchImpl = fetch, outDir = OUT_DIR, lo
 
     const enums = loadEnums();
     const codes = enums.allStateCodes();
+    const gate = createRateLimitGate(); // one 429 pauses every worker in this run
     let results;
     try {
         results = await mapWithConcurrency(codes, CONCURRENCY, async (code) => ({
             code,
-            shops: await fetchStateShops(apiBase, code, { fetchImpl }),
+            shops: await fetchStateShops(apiBase, code, { fetchImpl, sleep, now, gate, log }),
         }));
     } catch (err) {
         if (isDeployBuild(env)) throw err;
@@ -437,6 +525,7 @@ module.exports = {
     renderIndexPage,
     renderHead,
     fetchStateShops,
+    rateLimitWaitMs,
     mapWithConcurrency,
     main,
 };
