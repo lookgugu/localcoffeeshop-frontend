@@ -18,7 +18,7 @@
 import http from 'node:http';
 import { readFile, mkdir } from 'node:fs/promises';
 import { extname, join, normalize, resolve, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { chromium, devices } from 'playwright';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -98,15 +98,23 @@ const HEALTHY = (path) => {
 };
 const failingStates = (status) => (path, url) => (path === '/states' ? { status, body: { success: false } } : HEALTHY(path, url));
 
+const QA_API_BASE_URL = 'https://api.localcoffeeshop.co/api/v1';
+const QA_CONFIG_JS = `window.APP_CONFIG = { API_BASE_URL: '${QA_API_BASE_URL}', ENVIRONMENT: 'qa' };`;
+
 async function installRoutes(page, state, unexpected) {
-    // Deterministic config: always point at the production API URL, which is mocked below.
-    await page.route(`${ORIGIN}/config.js`, (route) => route.fulfill({
-        contentType: 'application/javascript',
-        body: "window.APP_CONFIG = { API_BASE_URL: 'https://api.localcoffeeshop.co/api/v1', ENVIRONMENT: 'qa' };",
-    }));
     await page.route('**/*', async (route) => {
         const request = route.request();
         const url = new URL(request.url());
+        // Deterministic config: always point at the production API URL, which is
+        // mocked below. Fulfilled inside the **/* handler because Playwright runs
+        // routes in reverse registration order and route.continue() goes straight
+        // to the network instead of falling back to earlier page.route() handlers.
+        if (url.origin === ORIGIN && url.pathname === '/config.js') {
+            return route.fulfill({
+                contentType: 'application/javascript',
+                body: QA_CONFIG_JS,
+            });
+        }
         const apiMatch = url.pathname.match(/\/api\/v1(\/.*)$/);
         const isApiHost = url.origin === 'https://api.localcoffeeshop.co' || (url.origin === ORIGIN && apiMatch);
         if (isApiHost && apiMatch) {
@@ -133,6 +141,14 @@ async function installRoutes(page, state, unexpected) {
 
 function check(condition, message) {
     if (!condition) throw new Error(message);
+}
+
+async function checkConfig(page) {
+    const config = await page.evaluate(() => window.APP_CONFIG);
+    check(
+        config?.API_BASE_URL === QA_API_BASE_URL && config?.ENVIRONMENT === 'qa',
+        `expected deterministic QA APP_CONFIG (${QA_API_BASE_URL}, qa), got ${JSON.stringify(config)}`,
+    );
 }
 
 async function noHorizontalOverflow(page) {
@@ -260,6 +276,7 @@ async function main() {
                 await installRoutes(page, state, unexpected);
                 try {
                     await page.goto(ORIGIN + scenario.path);
+                    await checkConfig(page);
                     await scenario.run(page, state);
                     await noHorizontalOverflow(page);
                     check(pageErrors.length === 0, `uncaught page errors: ${pageErrors.join('; ')}`);
@@ -283,7 +300,11 @@ async function main() {
     if (failures.length) process.exitCode = 1;
 }
 
-main().catch((err) => {
-    console.error(err);
-    process.exitCode = 1;
-});
+export { ORIGIN, QA_API_BASE_URL, QA_CONFIG_JS, HEALTHY, installRoutes, checkConfig };
+
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+    main().catch((err) => {
+        console.error(err);
+        process.exitCode = 1;
+    });
+}
