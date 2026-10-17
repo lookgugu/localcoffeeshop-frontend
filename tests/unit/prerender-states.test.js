@@ -356,6 +356,46 @@ describe('renderStatePages', () => {
     expect(items.map((i) => i.priceRange)).toEqual(['$', '$$$', undefined]);
   });
 
+  it('gives each static shop card the same Directions/Website links as the interactive page', () => {
+    const [page] = renderStatePages(enums, {
+      code: 'CA',
+      shops: [
+        { displayName: { text: 'Alpha & Co' }, formattedAddress: '1 A St, Los Angeles, CA', websiteUri: 'https://alpha.example/?a=1&b=2' },
+        { displayName: { text: 'Beta' }, formattedAddress: '2 B St, Fresno, CA', websiteUri: 'javascript:alert(1)' },
+        { displayName: { text: 'Gamma' } },
+      ],
+    });
+
+    const cards = page.html.split('<li class="coffee-item">').slice(1);
+    expect(cards).toHaveLength(3);
+    const href = (card, kind) => card.match(new RegExp(`class="shop-action shop-action-${kind}" href="([^"]+)"`))?.[1];
+
+    const dir = href(cards[0], 'directions').replace(/&amp;/g, '&');
+    expect(new URL(dir).searchParams.get('destination')).toBe('Alpha & Co, 1 A St, Los Angeles, CA');
+    expect(href(cards[0], 'website')).toBe('https://alpha.example/?a=1&amp;b=2');
+    expect(cards[0]).toContain('aria-label="Directions to Alpha &amp; Co on Google Maps"');
+
+    expect(href(cards[1], 'directions')).toBeTruthy();
+    expect(href(cards[1], 'website')).toBeUndefined();
+    expect(page.html).not.toContain('javascript:');
+
+    expect(cards[2]).not.toContain('shop-actions');
+    expect(page.html).not.toMatch(/target=/);
+  });
+
+  it('carries the coverage/freshness notice with a correction link and no invented timestamps', () => {
+    const [page] = renderStatePages(enums, { code: 'CA', shops: shops(2) });
+    const index = renderIndexPage(enums, [{ code: 'CA', shops: shops(2) }]);
+    for (const html of [page.html, index]) {
+      const notice = html.match(/<p class="coverage-notice"[^>]*>([\s\S]*?)<\/p>/)?.[1];
+      expect(notice).toBeTruthy();
+      expect(notice).toMatch(/not exhaustive/i);
+      expect(notice).toMatch(/before (you )?visit/i);
+      expect(notice).toContain('href="/submit.html"');
+      expect(notice).not.toMatch(/\b(updated|as of|last checked)\b|\d{4}-\d{2}-\d{2}/i);
+    }
+  });
+
   it('renders one noindex page for a state with no shops', () => {
     const pages = renderStatePages(enums, { code: 'WY', shops: [] });
 

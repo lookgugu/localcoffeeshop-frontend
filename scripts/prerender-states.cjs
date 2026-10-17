@@ -57,6 +57,27 @@ function loadEnums() {
     return sandbox.module.exports;
 }
 
+/**
+ * Load public/shop-actions.js (also a browser UMD script) the same way, so
+ * static cards get exactly the Directions/Website links the dynamic pages
+ * render. `URL` isn't an ECMAScript built-in, so pass Node's in.
+ */
+function loadShopActions() {
+    const src = fs.readFileSync(path.join(ROOT, 'public/shop-actions.js'), 'utf8');
+    const sandbox = { module: { exports: {} }, URL };
+    vm.runInNewContext(src, sandbox);
+    return sandbox.module.exports;
+}
+
+const shopActions = loadShopActions();
+
+/**
+ * Coverage/freshness notice. Same text as public/html/index.html and
+ * state.html (a test checks they match). Deliberately no "last updated"
+ * date: the build doesn't know when the API's data was last verified.
+ */
+const COVERAGE_NOTICE_HTML = '<p class="coverage-notice" role="note">This directory is not exhaustive, and details like hours, addresses and websites can change. Please check with the shop before you visit. Spot something wrong or missing? <a href="/submit.html">Suggest a correction</a>.</p>';
+
 /** Deploy (production) build, as opposed to a local one. */
 function isDeployBuild(env = process.env) {
     return env.NODE_ENV === 'production';
@@ -260,9 +281,11 @@ function renderStatePages(enums, { code, shops }) {
             const price = priceInfo && priceInfo.numeric > 0
                 ? `\n                <span class="price-level ${escapeHtml(priceInfo.cssClass)}" aria-label="Price level: ${escapeHtml(priceInfo.label.toLowerCase())}">${escapeHtml(priceInfo.label.toLowerCase())}</span>`
                 : '';
+            const actionsHtml = shopActions.renderShopActionsHtml(shop, escapeHtml);
+            const actions = actionsHtml ? `\n                ${actionsHtml}` : '';
             return `            <li class="coffee-item">
                 <h3>${escapeHtml(shop.displayName?.text || 'Unknown')}</h3>
-                <p>${escapeHtml(shop.formattedAddress || '')}</p>${price}
+                <p>${escapeHtml(shop.formattedAddress || '')}</p>${price}${actions}
             </li>`;
         }).join('\n');
 
@@ -295,7 +318,8 @@ ${renderHead({
             <p>Total Coffee Shops: <span>${total}</span></p>
             <p>Average Price Level: <span>${escapeHtml(avg)}</span></p>${showing}
             <p><a href="/html/state.html?code=${escapeHtml(code)}">Open the interactive view</a></p>
-        </div>${pagination}
+        </div>
+        ${COVERAGE_NOTICE_HTML}${pagination}
         <ul class="coffee-list">
 ${list}
         </ul>${pagination}
@@ -334,6 +358,7 @@ ${renderHead({
     <div class="container">
         <a href="/" class="back-button">← Home</a>
         <h1>Coffee Shops by State</h1>
+        ${COVERAGE_NOTICE_HTML}
         <ul class="coffee-list">
 ${rows}
         </ul>
@@ -514,6 +539,7 @@ async function main({
 
 module.exports = {
     loadEnums,
+    COVERAGE_NOTICE_HTML,
     isDeployBuild,
     resolveApiTarget,
     stateSlug,

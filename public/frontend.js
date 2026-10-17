@@ -22,12 +22,16 @@
     if (!window.CoffeeShopStore) {
         throw new Error('window.CoffeeShopStore not loaded — check script order in HTML');
     }
+    if (!window.CoffeeShopActions) {
+        throw new Error('window.CoffeeShopActions not loaded — check script order in HTML');
+    }
     const Enums = window.CoffeeShopEnums;
     const { stateName, isStateCode, Price } = Enums;
     const { createSkeletonItem } = window.CoffeeShopSkeleton;
     const api = window.ApiClient;
-    const { ApiEnvelopeError, ApiHttpError } = api.errors;
+    const { ApiHttpError, ApiNetworkError, ApiTimeoutError } = api.errors;
     const { createStore } = window.CoffeeShopStore;
+    const { createShopActions } = window.CoffeeShopActions;
 
     const CONSTANTS = {
         // Performance Settings
@@ -181,73 +185,176 @@
     // API FUNCTIONS
     // ============================================================================
 
-    async function checkServerStatus() {
-        try {
-            await api.get('/health');
-            const serverStatus = document.getElementById('serverStatus');
-            if (serverStatus) {
-                serverStatus.style.display = 'none';
-            }
-            return true;
-        } catch (error) {
-            handleError(error, 'checkServerStatus');
-            showServerError();
-            return false;
+    // Static state directory, prerendered at build time: works without the API.
+    const STATIC_DIRECTORY_URL = '/pages/states/';
+
+    /**
+     * User-facing explanation for a failed initial load, from the ApiClient
+     * error type. Only a 5xx is described as a server problem; a 429 is a
+     * rate limit (often a shared network, #24), and a network error is
+     * "offline" only when the browser says so.
+     */
+    function describeLoadFailure(error) {
+        if (error instanceof ApiHttpError && error.status === 429) {
+            return 'Too many requests are reaching the directory from your network right now. Please wait a minute, then try again.';
         }
+        if (error instanceof ApiHttpError && error.status >= 500) {
+            return `The directory server had a problem (HTTP ${error.status}). Please try again in a few minutes.`;
+        }
+        if (error instanceof ApiNetworkError || error instanceof ApiTimeoutError) {
+            if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+                return 'You appear to be offline. Reconnect to the internet, then try again.';
+            }
+            return error instanceof ApiTimeoutError
+                ? 'The directory server took too long to respond. Please try again.'
+                : 'We couldn\'t reach the directory server. Check your connection, then try again.';
+        }
+        return 'The directory server sent a response we couldn\'t use. Please try again.';
     }
 
-    function showServerError() {
+    /** Search and filters, which all need the API. */
+    function apiControls() {
+        return [dom.searchInput, dom.stateFilter, dom.priceFilter].filter(Boolean);
+    }
+
+    function setControlsAvailable(available) {
+        apiControls().forEach(el => {
+            el.disabled = !available;
+            if (available) {
+                el.removeAttribute('aria-disabled');
+                el.removeAttribute('aria-describedby');
+            } else {
+                el.setAttribute('aria-disabled', 'true');
+                el.setAttribute('aria-describedby', 'serverStatusMessage');
+            }
+        });
+    }
+
+    /** Link to the static state directory, the API-independent fallback. */
+    function createDirectoryLink() {
+        const link = document.createElement('a');
+        link.href = STATIC_DIRECTORY_URL;
+        link.textContent = 'Browse the state directory';
+        return link;
+    }
+
+    /**
+     * Fill #serverStatus (role=alert) with the cause, a "Try again" button and
+     * the static-directory link. Built once and reused, so retries never add
+     * a second button or listener.
+     */
+    function showDirectoryUnavailable(message) {
+        setControlsAvailable(false);
+
         const serverStatus = document.getElementById('serverStatus');
         if (serverStatus) {
+            let messageEl = document.getElementById('serverStatusMessage');
+            if (!messageEl) {
+                serverStatus.replaceChildren();
+                messageEl = document.createElement('p');
+                messageEl.id = 'serverStatusMessage';
+                serverStatus.appendChild(messageEl);
+
+                const actions = document.createElement('p');
+                actions.className = 'server-status-actions';
+                const retry = document.createElement('button');
+                retry.type = 'button';
+                retry.className = 'retry-button';
+                retry.textContent = 'Try again';
+                retry.addEventListener('click', retryDirectoryLoad);
+                actions.appendChild(retry);
+                actions.appendChild(document.createTextNode(' or '));
+                actions.appendChild(createDirectoryLink());
+                actions.appendChild(document.createTextNode(' (works without live search).'));
+                serverStatus.appendChild(actions);
+            }
+            messageEl.textContent = `Search and filters are unavailable. ${message}`;
+            const retry = serverStatus.querySelector('.retry-button');
+            retry.disabled = false;
+            retry.textContent = 'Try again';
             serverStatus.style.display = 'block';
         }
+
         if (dom.stateGrid) {
             const errorDiv = document.createElement('div');
             errorDiv.className = 'error';
-            errorDiv.textContent = 'Unable to connect to the server. Please try again later or contact support if the problem persists.';
-            dom.stateGrid.replaceChildren();
-            dom.stateGrid.appendChild(errorDiv);
+            errorDiv.appendChild(document.createTextNode('The live state list couldn\'t be loaded. '));
+            errorDiv.appendChild(createDirectoryLink());
+            errorDiv.appendChild(document.createTextNode(' instead.'));
+            dom.stateGrid.replaceChildren(errorDiv);
+        }
+    }
+
+    function showDirectoryAvailable() {
+        setControlsAvailable(true);
+        const serverStatus = document.getElementById('serverStatus');
+        if (serverStatus) {
+            serverStatus.style.display = 'none';
         }
     }
 
     async function initializeStateList() {
+        const data = await api.get('/states');
+
+        if (!Array.isArray(data)) {
+            throw new Error('Invalid data format: expected array');
+        }
+
+        // Build a sorted-by-code list of state metadata. Sort eagerly so we
+        // write the final shape to the store exactly once.
+        const availableStates = data
+            .filter(isValidStateInfo)
+            .map(stateInfo => ({
+                code: stateInfo.state_code,
+                shopCount: stateInfo.shop_count,
+                avgPriceLevel: stateInfo.avg_price_level,
+                loaded: false
+            }))
+            .sort((a, b) => a.code.localeCompare(b.code));
+
+        store.set('availableStates', availableStates);
+
+        // Add states to filter dropdown, replacing any from an earlier load
+        // (keeps the "All States" option).
+        dom.stateFilter.querySelectorAll('option:not([value=""])').forEach(o => o.remove());
+        availableStates.forEach(stateInfo => {
+            const option = document.createElement('option');
+            option.value = stateInfo.code;
+            option.textContent = stateName(stateInfo.code);
+            dom.stateFilter.appendChild(option);
+        });
+    }
+
+    /**
+     * Initial data load: health check, then the state list. On failure the
+     * page explains why and offers a retry (#25). Returns true on success.
+     */
+    async function loadDirectory() {
         try {
-            const data = await api.get('/states');
-
-            if (!Array.isArray(data)) {
-                throw new Error('Invalid data format: expected array');
-            }
-
-            // Build a sorted-by-code list of state metadata. Sort eagerly so we
-            // write the final shape to the store exactly once.
-            const availableStates = data
-                .filter(isValidStateInfo)
-                .map(stateInfo => ({
-                    code: stateInfo.state_code,
-                    shopCount: stateInfo.shop_count,
-                    avgPriceLevel: stateInfo.avg_price_level,
-                    loaded: false
-                }))
-                .sort((a, b) => a.code.localeCompare(b.code));
-
-            store.set('availableStates', availableStates);
-
-            // Add states to filter dropdown
-            availableStates.forEach(stateInfo => {
-                const option = document.createElement('option');
-                option.value = stateInfo.code;
-                option.textContent = stateName(stateInfo.code);
-                dom.stateFilter.appendChild(option);
-            });
+            await api.get('/health');
+            await initializeStateList();
         } catch (error) {
-            handleError(error, 'initializeStateList');
-            if (dom.stateGrid) {
-                const errorDiv = document.createElement('div');
-                errorDiv.className = 'error';
-                errorDiv.textContent = 'Error loading state data. Please make sure the server is running.';
-                dom.stateGrid.replaceChildren();
-                dom.stateGrid.appendChild(errorDiv);
-            }
+            handleError(error, 'loadDirectory');
+            showDirectoryUnavailable(describeLoadFailure(error));
+            return false;
+        }
+        showDirectoryAvailable();
+        return true;
+    }
+
+    let retrying = false;
+    async function retryDirectoryLoad(event) {
+        if (retrying) return;
+        retrying = true;
+        const button = event && event.currentTarget;
+        if (button) {
+            button.disabled = true;
+            button.textContent = 'Trying again...';
+        }
+        try {
+            if (await loadDirectory()) loadURLParams();
+        } finally {
+            retrying = false;
         }
     }
 
@@ -327,6 +434,10 @@
             price.setAttribute('aria-label', `Price level: ${priceLabel}`);
             item.appendChild(price);
         }
+
+        // Directions (and the shop's website, when the API has a safe one).
+        const actions = createShopActions(document, shop);
+        if (actions) item.appendChild(actions);
 
         return item;
     }
@@ -417,7 +528,13 @@
      */
     function renderSearchPagination(state) {
         const container = dom.searchResultsContainer;
-        if (!container || !state.shops.length) return;
+        if (!container) return;
+        if (!state.shops.length) {
+            // Cursor dropped (results superseded): don't leave a dead button.
+            const stale = container.querySelector('.load-more');
+            if (stale) stale.remove();
+            return;
+        }
 
         const { currentlyShowing, total, hasNext, loading } = state;
 
@@ -625,6 +742,11 @@
         if (searchTimeout) {
             clearTimeout(searchTimeout);
         }
+        // The inputs changed, so the shown results are about to be replaced:
+        // invalidate in-flight requests now, not after the debounce (#39), or
+        // a "Load More" page landing in the meantime would append the old
+        // query's shops and move focus.
+        startNewSearchGeneration();
         searchTimeout = setTimeout(() => {
             searchCoffeeShops().catch(err =>
                 handleError(err, 'debounceSearch')
@@ -1030,9 +1152,7 @@
             store.subscribe('lastSearchResults', displayResults);
             store.subscribe('loadMoreState', renderSearchPagination);
 
-            const serverIsRunning = await checkServerStatus();
-            if (serverIsRunning) {
-                await initializeStateList();
+            if (await loadDirectory()) {
                 loadURLParams();
             }
         };

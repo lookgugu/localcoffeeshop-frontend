@@ -3,7 +3,7 @@
 
 // Bump cache version when STATIC_ASSETS changes so existing clients
 // re-precache the new dependency list on activate.
-const STATIC_CACHE = 'coffee-shop-static-v8';
+const STATIC_CACHE = 'coffee-shop-static-v9';
 const API_CACHE = 'coffee-shop-api-v7';
 
 // Static assets to cache on install.
