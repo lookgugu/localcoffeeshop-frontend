@@ -45,6 +45,7 @@
         // "Load More" reveals already-fetched shops first and only requests
         // the next API page once those run out.
         SEARCH_API_PAGE_SIZE: 100,
+        NEARBY_LIMIT: 50, // shops returned by "Find Near Me" (API max 100)
         // Pages to skip past when a whole API page fails validation.
         MAX_SKIPPED_PAGES: 3,
 
@@ -424,6 +425,13 @@
         stateTag.textContent = stateName(shop.state);
         item.appendChild(stateTag);
 
+        if (typeof shop.distanceKm === 'number' && Number.isFinite(shop.distanceKm)) {
+            const distance = document.createElement('p');
+            distance.className = 'distance';
+            distance.textContent = formatDistance(shop.distanceKm);
+            item.appendChild(distance);
+        }
+
         if (shop.priceLevel) {
             const priceInfo = Price.fromKey(shop.priceLevel);
             const priceLabel = priceInfo.label.toLowerCase();
@@ -440,6 +448,12 @@
         if (actions) item.appendChild(actions);
 
         return item;
+    }
+
+    /** Format a distance in km for US readers: 0.3 -> "0.2 mi away". */
+    function formatDistance(km) {
+        const miles = km * 0.621371;
+        return `${miles < 10 ? miles.toFixed(1) : Math.round(miles)} mi away`;
     }
 
     /**
@@ -879,7 +893,6 @@
             const { latitude, longitude } = position.coords;
             try {
                 const shops = await fetchNearbyShops(latitude, longitude);
-                shops.sort((a, b) => a.distance - b.distance);
                 hideLoadingState();
                 // Subscriber on 'lastSearchResults' calls displayResults.
                 store.set('lastSearchResults', {
@@ -897,34 +910,20 @@
         });
     }
 
-    function calculateDistance(lat1, lon1, lat2, lon2) {
-        const R = 6371; // Radius of the earth in km
-        const dLat = (lat2 - lat1) * Math.PI / 180;
-        const dLon = (lon2 - lon1) * Math.PI / 180;
-        const a =
-            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-            Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        const d = R * c; // Distance in km
-        return d;
-    }
-
+    /**
+     * Nearest shops to a point from GET /nearby, closest first. Each shop
+     * carries `distanceKm` from the API.
+     */
     async function fetchNearbyShops(latitude, longitude) {
-        // Simulate fetching all shops and calculating distance.
-        // In a real application, this would be a dedicated API endpoint.
-        const allShops = [
-            { displayName: { text: 'The Coffee House' }, formattedAddress: '123 Main St, San Francisco, CA', state: 'CA', priceLevel: 'PRICE_LEVEL_MODERATE', lat: 37.7749, lon: -122.4194 },
-            { displayName: { text: 'Java Junction' }, formattedAddress: '456 Market St, San Francisco, CA', state: 'CA', priceLevel: 'PRICE_LEVEL_INEXPENSIVE', lat: 37.795, lon: -122.404 },
-            { displayName: { text: 'Daily Grind' }, formattedAddress: '789 Mission St, San Francisco, CA', state: 'CA', priceLevel: 'PRICE_LEVEL_EXPENSIVE', lat: 37.783, lon: -122.408 },
-            { displayName: { text: 'Alabama Coffee' }, formattedAddress: '101 Alabama St, Mobile, AL', state: 'AL', priceLevel: 'PRICE_LEVEL_MODERATE', lat: 30.6954, lon: -88.0399 },
-            { displayName: { text: 'Arizona Brew' }, formattedAddress: '202 Arizona Ave, Phoenix, AZ', state: 'AZ', priceLevel: 'PRICE_LEVEL_INEXPENSIVE', lat: 33.4484, lon: -112.0740 }
-        ];
-
-        return allShops.map(shop => {
-            const distance = calculateDistance(latitude, longitude, shop.lat, shop.lon);
-            return { ...shop, distance };
+        const data = await api.get('/nearby', {
+            query: { lat: latitude, lon: longitude, limit: CONSTANTS.NEARBY_LIMIT },
         });
+        if (!Array.isArray(data)) {
+            throw new Error('Invalid data format: expected array');
+        }
+        return data
+            .filter(isValidShop)
+            .sort((a, b) => a.distanceKm - b.distanceKm);
     }
 
     // ============================================================================
