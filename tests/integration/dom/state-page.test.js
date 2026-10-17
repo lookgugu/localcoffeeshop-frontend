@@ -17,6 +17,7 @@ import enums from '../../../public/enums.js';
 import skeleton from '../../../public/skeleton.js';
 import storeMod from '../../../public/store.js';
 import api from '../../../public/api-client.js';
+import shopActions from '../../../public/shop-actions.js';
 import { createRequire } from 'node:module';
 
 const { stateSlug } = createRequire(import.meta.url)('../../../scripts/prerender-states.cjs');
@@ -43,6 +44,7 @@ function stubWindowDeps() {
   window.CoffeeShopEnums = enums;
   window.CoffeeShopSkeleton = skeleton;
   window.CoffeeShopStore = storeMod;
+  window.CoffeeShopActions = shopActions;
   window.ApiClient = api;
 }
 
@@ -61,6 +63,7 @@ describe('state.js — invalid API response shape', () => {
     delete window.CoffeeShopEnums;
     delete window.CoffeeShopSkeleton;
     delete window.CoffeeShopStore;
+    delete window.CoffeeShopActions;
     delete window.ApiClient;
     while (document.body.firstChild) document.body.removeChild(document.body.firstChild);
     vi.resetModules();
@@ -123,6 +126,41 @@ describe('state.js — invalid API response shape', () => {
     expect(document.getElementById('pageTitle').textContent).toBe('Coffee Shops in California');
     expect(document.getElementById('totalShops').textContent).toBe('1');
     expect(document.querySelector('#coffeeList .coffee-item h3')?.textContent).toBe('Cafe Test');
+  });
+
+  it('gives each shop card a Directions link, and a Website link only for a safe API website', async () => {
+    Object.defineProperty(document, 'readyState', { configurable: true, value: 'complete' });
+    server.use(
+      http.get('*/api/v1/config', () => HttpResponse.json({ success: true, data: { frontendUrl: 'http://localhost' } })),
+      http.get('*/api/v1/states/CA', () => HttpResponse.json({
+        success: true,
+        data: [
+          { id: 1, displayName: { text: 'Alpha Cafe' }, formattedAddress: '1 A St, Los Angeles, CA 90001, USA', state: 'CA', websiteUri: 'https://alpha.example/' },
+          { id: 2, displayName: { text: 'Beta Beans' }, formattedAddress: '2 B St, Fresno, CA', state: 'CA', websiteUri: 'javascript:alert(1)' },
+          { id: 3, displayName: { text: 'Gamma (no address)' }, state: 'CA' },
+        ],
+      }))
+    );
+
+    vi.resetModules();
+    await import('../../../public/html/state.js');
+    await new Promise((r) => setTimeout(r, 100));
+
+    const cards = [...document.querySelectorAll('#coffeeList .coffee-item')];
+    expect(cards.map((c) => c.querySelector('h3').textContent)).toEqual(['Alpha Cafe', 'Beta Beans', 'Gamma (no address)']);
+
+    const [alpha, beta, gamma] = cards;
+    const dir = alpha.querySelector('a.shop-action-directions');
+    expect(new URL(dir.href).searchParams.get('destination')).toBe('Alpha Cafe, 1 A St, Los Angeles, CA 90001, USA');
+    expect(dir.getAttribute('aria-label')).toBe('Directions to Alpha Cafe on Google Maps');
+    expect(dir.hasAttribute('target')).toBe(false);
+    expect(alpha.querySelector('a.shop-action-website').getAttribute('href')).toBe('https://alpha.example/');
+
+    expect(beta.querySelector('a.shop-action-directions')).not.toBeNull();
+    expect(beta.querySelector('a.shop-action-website')).toBeNull();
+    expect(beta.innerHTML).not.toContain('javascript:');
+
+    expect(gamma.querySelector('.shop-actions')).toBeNull();
   });
 
   // Same slug function the build uses to name the files; the two must agree
@@ -229,6 +267,7 @@ describe('state.js — pagination (#16)', () => {
     delete window.CoffeeShopEnums;
     delete window.CoffeeShopSkeleton;
     delete window.CoffeeShopStore;
+    delete window.CoffeeShopActions;
     delete window.ApiClient;
     while (document.body.firstChild) document.body.removeChild(document.body.firstChild);
     vi.resetModules();

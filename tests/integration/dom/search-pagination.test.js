@@ -14,12 +14,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { http, HttpResponse, delay } from 'msw';
 import { server } from '../../helpers/mockApi.js';
-import { click, input } from '../../helpers/dom.js';
+import { click, input, change } from '../../helpers/dom.js';
 
 import enums from '../../../public/enums.js';
 import skeleton from '../../../public/skeleton.js';
 import storeMod from '../../../public/store.js';
 import api from '../../../public/api-client.js';
+import shopActions from '../../../public/shop-actions.js';
 
 const PRICES = ['PRICE_LEVEL_INEXPENSIVE', 'PRICE_LEVEL_MODERATE', 'PRICE_LEVEL_EXPENSIVE'];
 
@@ -88,6 +89,9 @@ function createTestDOM() {
   const anyPrice = document.createElement('option');
   anyPrice.value = '';
   priceFilter.appendChild(anyPrice);
+  const expensive = document.createElement('option');
+  expensive.value = 'PRICE_LEVEL_EXPENSIVE';
+  priceFilter.appendChild(expensive);
   container.appendChild(priceFilter);
 
   const searchResults = document.createElement('div');
@@ -127,6 +131,7 @@ describe('frontend.js — search pagination (#16)', () => {
     window.CoffeeShopEnums = enums;
     window.CoffeeShopSkeleton = skeleton;
     window.CoffeeShopStore = storeMod;
+    window.CoffeeShopActions = shopActions;
     window.ApiClient = api;
     Object.defineProperty(document, 'readyState', { configurable: true, value: 'complete' });
     Object.defineProperty(window, 'location', {
@@ -140,6 +145,7 @@ describe('frontend.js — search pagination (#16)', () => {
     delete window.CoffeeShopEnums;
     delete window.CoffeeShopSkeleton;
     delete window.CoffeeShopStore;
+    delete window.CoffeeShopActions;
     delete window.ApiClient;
     vi.restoreAllMocks();
     vi.resetModules();
@@ -405,6 +411,56 @@ describe('frontend.js — search pagination (#16)', () => {
     expect(results()[0].querySelector('h3').textContent).toBe('Latte 1');
   });
 
+  // #39: the generation token used to be bumped only inside the debounced
+  // searchCoffeeShops(), so a Load More response landing during the 300 ms
+  // debounce still appended the old query's shops and moved focus.
+  it.each([
+    ['typing in the search box', () => input(document.getElementById('searchInput'), 'latte')],
+    ['changing the price filter', () => change(document.getElementById('priceFilter'), 'PRICE_LEVEL_EXPENSIVE')],
+  ])('drops an in-flight Load More as soon as the inputs change (%s), before the debounce fires', async (_, edit) => {
+    const tx = makeShops(230);
+    let releasePage2;
+    const page2Gate = new Promise((r) => { releasePage2 = r; });
+    server.use(
+      http.get('*/api/v1/health', () => HttpResponse.json({ success: true, data: { status: 'ok' } })),
+      http.get('*/api/v1/search', async ({ request }) => {
+        const url = new URL(request.url);
+        const page = Number(url.searchParams.get('page') || 1);
+        requests.push({ page, q: url.searchParams.get('q'), price: url.searchParams.get('price') });
+        if (page === 2) await page2Gate; // controlled: resolves only when the test says so
+        return HttpResponse.json({
+          success: true,
+          data: tx.slice((page - 1) * 100, page * 100),
+          metadata: { pagination: { page, limit: 100, total: 230, totalPages: 3, hasNext: page < 3, hasPrev: page > 1 } },
+        });
+      })
+    );
+    vi.resetModules();
+    await import('../../../public/frontend.js');
+
+    await waitFor(() => expect(results()).toHaveLength(50));
+    click(loadMore());
+    await waitFor(() => expect(results()).toHaveLength(100));
+    click(loadMore()); // needs API page 2: in flight until released
+    await waitFor(() => expect(requests.filter((r) => r.page === 2)).toHaveLength(1));
+    const focusBefore = document.activeElement;
+
+    const editedAt = Date.now();
+    edit();
+    releasePage2(); // old page 2 lands now, well inside the 300 ms debounce
+    await new Promise((r) => setTimeout(r, 100));
+
+    expect(Date.now() - editedAt).toBeLessThan(300); // the debounced search hasn't run yet
+    expect(requests).toHaveLength(2);
+    expect(results()).toHaveLength(100);
+    expect(document.activeElement).toBe(focusBefore);
+    expect(loadMore()).toBeNull(); // no dead "Loading..." button for superseded results
+
+    // Then the debounced search runs normally with the new inputs.
+    await waitFor(() => expect(requests).toHaveLength(3));
+    expect(requests[2].page).toBe(1);
+  });
+
   it('skips past a first page whose records are all invalid when more pages exist', async () => {
     const all = makeShops(130);
     const badPage = Array.from({ length: 100 }, (_, i) => invalid(5000 + i));
@@ -450,6 +506,32 @@ describe('frontend.js — search pagination (#16)', () => {
     expect(resultCount().textContent).toBe('100 found');
     expect(loadMore()).toBeNull();
     expect(requests).toHaveLength(1);
+  });
+
+  it('gives each search result a Directions link, and a Website link only for a safe API website', async () => {
+    const data = [
+      { id: 1, displayName: { text: 'Lone Star Roasters' }, formattedAddress: '300 Congress Ave, Austin, TX 78701, USA', state: 'TX', websiteUri: 'https://lonestar.example/' },
+      { id: 2, displayName: { text: 'Data Brew' }, formattedAddress: '2 Elm St, Dallas, TX', state: 'TX', websiteUri: 'data:text/html,<script>alert(1)</script>' },
+      { id: 3, displayName: { text: 'Nowhere Cafe' }, state: 'TX' },
+    ];
+    await boot(http.get('*/api/v1/search', () => HttpResponse.json({ success: true, data })));
+
+    await waitFor(() => expect(results()).toHaveLength(3));
+    const [lone, dataBrew, nowhere] = results();
+
+    const dir = lone.querySelector('a.shop-action-directions');
+    expect(dir.textContent).toBe('Directions');
+    expect(new URL(dir.href).searchParams.get('destination')).toBe('Lone Star Roasters, 300 Congress Ave, Austin, TX 78701, USA');
+    expect(dir.getAttribute('aria-label')).toBe('Directions to Lone Star Roasters on Google Maps');
+    expect(dir.getAttribute('rel')).toBe('noopener noreferrer');
+    expect(dir.hasAttribute('target')).toBe(false);
+    const site = lone.querySelector('a.shop-action-website');
+    expect(site.getAttribute('href')).toBe('https://lonestar.example/');
+    expect(site.hasAttribute('target')).toBe(false);
+
+    expect(dataBrew.querySelector('a.shop-action-website')).toBeNull();
+    expect(dataBrew.querySelector('script')).toBeNull();
+    expect(nowhere.querySelector('.shop-actions')).toBeNull();
   });
 
   it('a response without pagination metadata is treated as the full result set', async () => {

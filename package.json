@@ -13,6 +13,8 @@
     "build:states": "node scripts/prerender-states.cjs",
     "build:js": "node scripts/build-js.cjs",
     "build:css": "npx clean-css-cli -o public/dist/styles.min.css styles.css public/styles/about.css public/styles/common.css public/styles/features.css public/styles/home.css public/styles/states.css",
+    "smoke": "node scripts/smoke-check.cjs",
+    "qa:browser": "node scripts/browser-qa.mjs",
     "test": "vitest",
     "test:coverage": "vitest --coverage",
     "test:ui": "vitest --ui",
@@ -27,6 +29,7 @@
     "happy-dom": "^20.3.9",
     "http-server": "^14.1.1",
     "msw": "^2.12.7",
+    "playwright": "1.60.0",
     "vitest": "^4.1.11"
   },
   "keywords": [

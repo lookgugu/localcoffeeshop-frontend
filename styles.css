@@ -168,6 +168,36 @@ body.has-offline-banner {
     color: #856404;
 }
 
+.server-status .server-status-actions {
+    margin-top: 10px;
+}
+
+.retry-button {
+    min-height: 44px; /* touch target */
+    padding: 0 16px;
+    border: 1px solid #856404;
+    border-radius: var(--radius-sm);
+    background-color: white;
+    color: #5c4503;
+    font: inherit;
+    cursor: pointer;
+}
+
+.retry-button:disabled {
+    cursor: progress;
+    opacity: 0.7;
+}
+
+.retry-button:focus-visible {
+    outline: 3px solid #4a7bff;
+    outline-offset: 2px;
+}
+
+.server-status a {
+    color: #5c4503;
+    font-weight: 600;
+}
+
 .server-status code {
     background-color: #f8f9fa;
     padding: 2px 6px;
@@ -258,6 +288,49 @@ body.has-offline-banner {
 
 .coffee-item p {
     margin-bottom: 5px;
+}
+
+/* Shop card actions: Directions / Website (public/shop-actions.js) */
+.shop-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+    margin-top: 12px;
+}
+
+.shop-action {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px; /* touch target */
+    padding: 0 14px;
+    border: 1px solid #1d4ed8;
+    border-radius: var(--radius-sm);
+    color: #1d4ed8; /* 6.7:1 on white */
+    font-size: 0.95rem;
+    text-decoration: none;
+}
+
+.shop-action:hover {
+    background-color: var(--color-primary-lighter);
+}
+
+.shop-action:focus-visible {
+    outline: 3px solid #4a7bff;
+    outline-offset: 2px;
+}
+
+/* Coverage / freshness notice on discovery pages */
+.coverage-notice {
+    margin: 0 0 20px;
+    padding: 10px 14px;
+    border-left: 4px solid #8a6d3b;
+    background-color: #fffaf0;
+    color: #4d3b1f;
+    font-size: 0.9rem;
+}
+
+.coverage-notice a {
+    color: #1d4ed8;
 }
 
 .state-tag {

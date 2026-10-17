@@ -28,7 +28,7 @@ const PAGES = {
 // Parser-blocking on purpose: config + consent defaults must run before gtag.
 const BLOCKING_SCRIPTS = ['/config.js', '/geo-consent-default.js'];
 
-const DEP_GLOBALS = ['CoffeeShopEnums', 'CoffeeShopSkeleton', 'ApiClient', 'CoffeeShopStore'];
+const DEP_GLOBALS = ['CoffeeShopEnums', 'CoffeeShopSkeleton', 'ApiClient', 'CoffeeShopStore', 'CoffeeShopActions'];
 
 function head(page) {
   const html = readFileSync(join(PUBLIC, page), 'utf8');
@@ -109,7 +109,7 @@ describe.each(Object.entries(PAGES))('%s', (page, { bundle, pageCode }) => {
   it('bundles the page code last, after its dependencies in order', () => {
     const files = BUNDLES[bundle];
     expect(files.at(-1)).toBe(pageCode);
-    const order = ['enums.js', 'skeleton.js', 'api-client.js', 'store.js', pageCode].map((f) => files.indexOf(f));
+    const order = ['enums.js', 'skeleton.js', 'api-client.js', 'store.js', 'shop-actions.js', pageCode].map((f) => files.indexOf(f));
     expect(order.every((i) => i >= 0)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
     expect(files).toEqual(expect.arrayContaining(['connection-banner.js', 'service-worker-registration.js']));
