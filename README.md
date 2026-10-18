@@ -136,6 +136,18 @@ API_BASE_URL=http://localhost:3000/api/v1
 npm test
 ```
 
+### Roaster directory (`/roasters/`)
+
+A curated, non-exhaustive list of roasters that sell packaged beans on their
+own websites, kept in `data/roasters.json` (no database). `npm run build`
+validates it and generates `public/roasters/index.html` (not committed);
+`npm run check:roasters` runs only the checker (CI does too). The checker
+rejects unsafe or non-official URLs, duplicates, missing sources/check dates,
+unexpected fields, and shipping/pickup marked "offered" without a quote from
+the roaster's own site (otherwise use `{ "status": "unknown" }`).
+`npm run qa:roasters` is a local Playwright check of the page (port 8188,
+all external requests blocked).
+
 ## Deployment
 
 ### DigitalOcean App Platform

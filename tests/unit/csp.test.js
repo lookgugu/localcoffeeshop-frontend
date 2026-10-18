@@ -18,6 +18,7 @@ import { join, relative, resolve } from 'node:path';
 const require = createRequire(import.meta.url);
 const { CSP_DIRECTIVES, CSP_POLICY, CSP_META_TAG, REFERRER_META_TAG } = require('../../scripts/csp.cjs');
 const prerender = require('../../scripts/prerender-states.cjs');
+const roasters = require('../../scripts/roasters.cjs');
 const enums = prerender.loadEnums();
 
 const ROOT = resolve(__dirname, '../..');
@@ -37,7 +38,7 @@ function servedSourcePages() {
       const full = join(dir, entry.name);
       const rel = relative(PUBLIC, full);
       if (entry.isDirectory()) {
-        if (rel === join('pages', 'states') || rel === 'dist') continue;
+        if (rel === join('pages', 'states') || rel === 'roasters' || rel === 'dist') continue;
         walk(full);
       } else if (entry.name.endsWith('.html')) {
         if (dir === PUBLIC && buildCopies.has(entry.name)) continue;
@@ -115,6 +116,10 @@ describe('Content Security Policy (#14)', () => {
     it('the states index carries the policy', () => {
       expectPolicy(prerender.renderIndexPage(enums, [{ code: 'TX', shops }]), 'states/index.html');
     });
+  });
+
+  it('the generated roaster directory carries the policy', () => {
+    expectPolicy(roasters.renderRoastersPage(roasters.loadRoasters()), 'roasters/index.html');
   });
 
   describe('the policy itself', () => {

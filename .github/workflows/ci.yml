@@ -14,6 +14,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test -- --run
+      # Curated roaster data (data/roasters.json): schema, provenance, safe
+      # URLs, duplicates. The build runs it too; this names the failure.
+      - run: npm run check:roasters
       # NODE_ENV and API_BASE_URL are unset, so this is a local build: the
       # state prerender skips instead of calling the rate-limited API (#24).
       - run: npm run build

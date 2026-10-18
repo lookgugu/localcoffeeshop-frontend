@@ -18,6 +18,7 @@ import { join, relative, resolve } from 'node:path';
 
 const require = createRequire(import.meta.url);
 const prerender = require('../../scripts/prerender-states.cjs');
+const roastersPage = require('../../scripts/roasters.cjs');
 const enums = prerender.loadEnums();
 
 const ROOT = resolve(__dirname, '../..');
@@ -28,7 +29,8 @@ const PUBLIC = join(ROOT, 'public');
 const KNOWN_BROKEN = {};
 
 // Build outputs that aren't committed: npm run build copies public/html/*.html
-// to the site root, and the prerender step writes /pages/states/.
+// to the site root, the prerender step writes /pages/states/, and
+// build:roasters writes /roasters/.
 const STATE_SLUGS = new Set(enums.allStateCodes().map((c) => prerender.stateSlug(enums, c)));
 
 function servedByDeploy(urlPath) {
@@ -43,6 +45,9 @@ function servedByDeploy(urlPath) {
   const rootHtml = clean.match(/^\/([^/]+\.html)$/);
   if (rootHtml && existsSync(join(PUBLIC, 'html', rootHtml[1]))) return true;
 
+  // build:roasters generates the roaster directory from data/roasters.json
+  if (clean === '/roasters/' || clean === '/roasters') return true;
+
   // build:states prerenders the state pages
   if (clean === '/pages/states/' || clean === '/pages/states') return true;
   const statePage = clean.match(/^\/pages\/states\/([a-z0-9-]+?)(?:-(\d+))?\.html$/);
@@ -56,7 +61,7 @@ function sourceFiles(dir) {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) {
       // dist/ is minified copies of these sources; pages/states/ is generated
-      return ['dist', 'states'].includes(entry.name) ? [] : sourceFiles(path);
+      return ['dist', 'states', 'roasters'].includes(entry.name) ? [] : sourceFiles(path);
     }
     // Root-level *.html are build copies of public/html/ (gitignored)
     if (dir === PUBLIC && entry.name.endsWith('.html')) return [];
@@ -140,6 +145,15 @@ describe('internal links', () => {
       }
     }
     expect([...new Set(broken)]).toEqual([]);
+  });
+
+  it('links on the generated roaster page resolve too', () => {
+    const page = roastersPage.renderRoastersPage(roastersPage.loadRoasters());
+    const broken = [...page.matchAll(/\b(?:href|src)="([^"]+)"/g)]
+      .map(([, url]) => url)
+      .filter((url) => !isExternal(url))
+      .filter((url) => !servedByDeploy(new URL(url, 'https://site.invalid/roasters/').pathname));
+    expect(broken).toEqual([]);
   });
 
   it('allowlists only links that are still broken', () => {
