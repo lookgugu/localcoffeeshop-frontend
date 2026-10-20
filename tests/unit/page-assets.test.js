@@ -25,8 +25,12 @@ const PAGES = {
   'html/state.html': { bundle: 'dist/state.bundle.min.js', pageCode: 'html/state.js' },
 };
 
-// Parser-blocking on purpose: config + consent defaults must run before gtag.
-const BLOCKING_SCRIPTS = ['/config.js', '/geo-consent-default.js'];
+// Parser-blocking on purpose: config + consent defaults must run before gtag,
+// and url-privacy.js must scrub the address bar before gtag config reads it.
+const BLOCKING_SCRIPTS = {
+  'html/index.html': ['/config.js', '/geo-consent-default.js', '/url-privacy.js', '/analytics-init.js'],
+  'html/state.html': ['/config.js', '/geo-consent-default.js', '/url-privacy.js', '/analytics-init.js'],
+};
 
 const DEP_GLOBALS = ['CoffeeShopEnums', 'CoffeeShopSkeleton', 'ApiClient', 'CoffeeShopStore', 'CoffeeShopActions'];
 
@@ -85,20 +89,22 @@ describe.each(Object.entries(PAGES))('%s', (page, { bundle, pageCode }) => {
 
   it('only blocks the parser for config and consent defaults', () => {
     const blocking = sameOrigin.filter((t) => !t.defer && !t.async).map((t) => t.src);
-    expect(blocking).toEqual(BLOCKING_SCRIPTS);
+    expect(blocking).toEqual(BLOCKING_SCRIPTS[page]);
   });
 
   it('queues consent defaults before the Google tag', () => {
     const idx = (pred) => tags.findIndex(pred);
     const geo = idx((t) => t.src === '/geo-consent-default.js');
-    const consentDefault = idx((t) => /gtag\('consent',\s*'default'/.test(t.body));
+    const privacy = idx((t) => t.src === '/url-privacy.js');
+    // analytics-init.js queues consent default, then js + config (tests/unit/analytics-pages.test.js)
+    const init = idx((t) => t.src === '/analytics-init.js');
     const gtagJs = idx((t) => t.src?.startsWith('https://www.googletagmanager.com/gtag/js?id=G-YVSXN7PM48'));
-    const gtagConfig = idx((t) => /gtag\('config',\s*'G-YVSXN7PM48'\)/.test(t.body));
 
     expect(geo).toBeGreaterThan(-1);
-    expect(geo).toBeLessThan(consentDefault);
-    expect(consentDefault).toBeLessThan(gtagJs);
-    expect(gtagJs).toBeLessThan(gtagConfig);
+    expect(geo).toBeLessThan(privacy);
+    expect(privacy).toBeLessThan(init);
+    expect(init).toBeLessThan(gtagJs);
+    expect(tags.some((t) => /gtag\(/.test(t.body))).toBe(false); // no inline gtag
     expect(tags[gtagJs].async).toBe(true);
   });
 

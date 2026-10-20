@@ -86,11 +86,15 @@ describe('generated /roasters/ page', () => {
   it('queues the consent default before gtag loads, then the banner and page script', () => {
     const order = [...page.matchAll(/<script\b[^>]*\bsrc="([^"]+)"/g)].map((m) => m[1]);
     expect(order).toEqual([
+      '/config.js',
       '/geo-consent-default.js',
+      '/url-privacy.js',
       '/analytics-init.js',
       'https://www.googletagmanager.com/gtag/js?id=G-YVSXN7PM48',
       '/consent-banner.js',
+      '/analytics-events.js',
       '/roasters.js',
+      '/waitlist.js',
     ]);
   });
 
@@ -103,25 +107,49 @@ describe('generated /roasters/ page', () => {
 });
 
 describe('analytics-init.js', () => {
-  const run = (initial) => {
+  const FIELDS = { page_location: 'https://localcoffeeshop.co/', page_referrer: '' };
+  const run = (initial, { privacy = { analyticsFields: () => FIELDS }, throwsConsent = false } = {}) => {
     const sandbox = { window: {}, Date };
     sandbox.window = sandbox;
-    if (initial) sandbox.LocalCoffeeShopConsent = { getInitialConsentState: () => initial };
+    if (throwsConsent) sandbox.LocalCoffeeShopConsent = { getInitialConsentState: () => { throw new Error('boom'); } };
+    else if (initial) sandbox.LocalCoffeeShopConsent = { getInitialConsentState: () => initial };
+    if (privacy) sandbox.LcsUrlPrivacy = privacy;
     vm.runInNewContext(readFileSync(join(PUBLIC, 'analytics-init.js'), 'utf8'), sandbox);
-    return sandbox.dataLayer.map((args) => Array.from(args));
+    return { queue: sandbox.dataLayer.map((args) => Array.from(args)), sandbox };
   };
 
-  it('queues consent default (from geo-consent-default.js) before js/config, like the inline pages', () => {
+  it('queues consent default (from geo-consent-default.js) before js/config', () => {
     const initial = { analytics_storage: 'granted' };
-    const queue = run(initial);
+    const { queue } = run(initial);
     expect(queue.map((a) => a[0])).toEqual(['consent', 'js', 'config']);
     expect(queue[0]).toEqual(['consent', 'default', initial]);
-    expect(queue[2]).toEqual(['config', 'G-YVSXN7PM48']);
   });
 
-  it('defaults to denied analytics/ads if the geo default is unavailable', () => {
-    const [consent] = run(null);
-    expect(consent[2]).toMatchObject({ analytics_storage: 'denied', ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' });
+  it('the first config carries explicit sanitised page_location and page_referrer', () => {
+    const { queue } = run({ analytics_storage: 'denied' });
+    expect(queue[2]).toEqual(['config', 'G-YVSXN7PM48', { page_location: FIELDS.page_location, page_referrer: '' }]);
+  });
+
+  it('defaults to denied analytics/ads if the geo default is unavailable or throws', () => {
+    for (const { queue } of [run(null), run(null, { throwsConsent: true })]) {
+      expect(queue[0][2]).toMatchObject({ analytics_storage: 'denied', ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' });
+    }
+  });
+
+  it.each([
+    ['helper missing/blocked', { privacy: null }],
+    ['helper without analyticsFields', { privacy: {} }],
+    ['helper throws', { privacy: { analyticsFields: () => { throw new Error('boom'); } } }],
+    ['helper returns null', { privacy: { analyticsFields: () => null } }],
+    ['helper returns a raw/non-string referrer', { privacy: { analyticsFields: () => ({ page_location: 'https://x.test/', page_referrer: undefined }) } }],
+  ])('FAILS CLOSED, no raw fallback, when the %s', (_label, opts) => {
+    const { queue, sandbox } = run({ analytics_storage: 'granted' }, opts);
+    expect(queue.map((a) => a[0])).toEqual(['consent']); // default only: no js, no config
+    expect(sandbox['ga-disable-G-YVSXN7PM48']).toBe(true);
+  });
+
+  it('does not set the disable flag when everything works', () => {
+    expect(run(null).sandbox['ga-disable-G-YVSXN7PM48']).toBeUndefined();
   });
 });
 

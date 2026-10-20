@@ -817,7 +817,12 @@
         return { ...result, rejected };
     }
 
-    async function searchCoffeeShops() {
+    /**
+     * @param {{ initial?: boolean }} [options] `initial` marks the search run
+     *   for a deep link (?q=/state=/price= on page load): it still searches
+     *   and renders, but is NOT counted as a person searching.
+     */
+    async function searchCoffeeShops({ initial = false } = {}) {
         const searchTerm = dom.searchInput?.value || '';
         const selectedState = dom.stateFilter?.value || '';
         const selectedPrice = dom.priceFilter?.value || '';
@@ -826,8 +831,10 @@
         // (its first page or a "Load More" page) and its pagination cursor.
         const generation = startNewSearchGeneration();
 
-        // Update URL with search parameters
-        updateURLParams({ q: searchTerm, state: selectedState, price: selectedPrice });
+        // Mirror only the categorical filters to the URL. The search text is
+        // never written there: GA reads page_location on history changes and
+        // its site-search detection reports ?q= (see url-privacy.js).
+        updateURLParams({ state: selectedState, price: selectedPrice });
 
         if (!searchTerm && !selectedState && !selectedPrice) {
             if (dom.searchResultsContainer) {
@@ -851,6 +858,7 @@
             // The 'lastSearchResults' subscriber (createStore wiring in initialize)
             // calls displayResults — no explicit call needed here.
             store.set('lastSearchResults', { ...result, query });
+            if (initial) rememberSearch(query); else trackSearch(query, result.total);
         } catch (error) {
             if (generation !== searchGeneration) return;
             hideLoadingState();
@@ -928,6 +936,43 @@
     }
 
     // ============================================================================
+    // ANALYTICS (public/analytics-events.js; optional — never breaks search)
+    // ============================================================================
+
+    // Signature of the last search counted, kept in memory only (it contains
+    // the raw text, which is never sent): repeated identical searches — e.g. a
+    // filter re-selected to the same value — are not counted twice.
+    let lastTrackedSearch = null;
+
+    function searchSignature(query) {
+        return JSON.stringify([query.q.trim().toLowerCase(), query.state, query.price]);
+    }
+
+    // The deep-linked initial search is remembered, not counted, so a person
+    // re-running the very same search is not double counted either.
+    function rememberSearch(query) {
+        lastTrackedSearch = searchSignature(query);
+    }
+
+    function trackSearch(query, total) {
+        const signature = searchSignature(query);
+        if (signature === lastTrackedSearch) return;
+        lastTrackedSearch = signature;
+        const analytics = window.LcsAnalytics;
+        if (!analytics || typeof analytics.track !== 'function') return;
+        try {
+            analytics.track('directory_search', {
+                search_has_query: query.q.trim() ? 'yes' : 'no',
+                search_state: query.state || 'all',
+                search_price: query.price || 'any',
+                result_count: Number.isInteger(total) ? total : 0,
+            });
+        } catch (e) {
+            // analytics must never break search
+        }
+    }
+
+    // ============================================================================
     // URL STATE MANAGEMENT
     // ============================================================================
 
@@ -944,14 +989,23 @@
             }
         });
 
-        // Update URL without page reload
-        window.history.replaceState({}, '', url);
+        // Update URL without page reload; skip a no-op write (GA's history
+        // listener would report a synthetic page_view for it).
+        const next = url.pathname + url.search + url.hash;
+        if (next !== window.location.pathname + window.location.search + window.location.hash) {
+            window.history.replaceState({}, '', url);
+        }
     }
 
     function loadURLParams() {
         const params = new URLSearchParams(window.location.search);
 
-        const searchTerm = params.get('q') || '';
+        // url-privacy.js removed ?q= from the address bar before analytics
+        // loaded and hands it over once; fall back to the URL without it.
+        const privacy = window.LcsUrlPrivacy;
+        const handedOver = privacy && typeof privacy.takeInitialQuery === 'function'
+            ? privacy.takeInitialQuery() : null;
+        const searchTerm = handedOver || params.get('q') || '';
         const stateParam = params.get('state') || '';
         const priceParam = params.get('price') || '';
 
@@ -962,7 +1016,7 @@
 
         // Trigger search if any params exist
         if (searchTerm || stateParam || priceParam) {
-            searchCoffeeShops().catch(err =>
+            searchCoffeeShops({ initial: true }).catch(err =>
                 handleError(err, 'loadURLParams')
             );
         }
