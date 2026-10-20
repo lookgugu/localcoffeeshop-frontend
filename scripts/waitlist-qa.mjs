@@ -495,7 +495,6 @@ const SCENARIOS = [
             // filtered by link_classes=roaster-shop + the catalog merchant URL.
             const shopUrl = await shop.getAttribute('href');
             check(ROASTERS.find((r) => r.id === roasterId)?.shopUrl === shopUrl, `link ${shopUrl} is not the catalog shopUrl for ${roasterId}`);
-            await shop.click();
             const click = await waitForEvent(state, 'click', (h) => h['ep.link_classes'] === 'roaster-shop');
             check(click['ep.outbound'] === 'true' && click['ep.link_url'] === shopUrl, `outbound click params ${JSON.stringify(click)}`);
             await page.waitForTimeout(2500);
