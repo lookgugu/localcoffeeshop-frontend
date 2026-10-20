@@ -22,6 +22,7 @@
 const fs = require('fs');
 const path = require('path');
 const { escapeHtml, loadEnums, renderHead } = require('./prerender-states.cjs');
+const { renderWaitlistSection } = require('./waitlist-markup.cjs');
 
 const ROOT = path.join(__dirname, '..');
 const DATA_PATH = path.join(ROOT, 'data/roasters.json');
@@ -389,13 +390,19 @@ ${renderHead({
         noindex: false,
     })}
 
-    <!-- Google Consent Mode default is queued before gtag config
-         (geo-consent-default.js, then analytics-init.js); no inline scripts. -->
+    <!-- config.js gives the waitlist form its API URL. Google Consent Mode
+         default is queued before gtag config (geo-consent-default.js, then
+         analytics-init.js), after url-privacy.js has removed search text
+         from the address bar; no inline scripts. -->
+    <script src="/config.js"></script>
     <script src="/geo-consent-default.js"></script>
+    <script src="/url-privacy.js"></script>
     <script src="/analytics-init.js"></script>
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-YVSXN7PM48"></script>
     <script defer src="/consent-banner.js"></script>
+    <script defer src="/analytics-events.js"></script>
     <script defer src="/roasters.js"></script>
+    <script defer src="/waitlist.js"></script>
     <script type="application/ld+json">${buildJsonLd(rows, pageUrl)}</script>
 </head>
 <body>
@@ -434,6 +441,8 @@ ${rows.map(renderRow).join('\n')}
                 <button type="button" class="roaster-reset" id="roasterEmptyReset">Clear filters</button>
             </div>
         </section>
+
+        ${renderWaitlistSection('roasters')}
 
         <section class="roaster-methodology" aria-labelledby="methodologyHeading">
             <h2 id="methodologyHeading">How this list is made</h2>

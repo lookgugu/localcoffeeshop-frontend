@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://www.googletagmanager.com https://*.google-analytics.com https://*.g.doubleclick.net https://*.google.com; connect-src 'self' https://api.localcoffeeshop.co http://localhost:3000 https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com https://*.g.doubleclick.net https://*.google.com https://pagead2.googlesyndication.com; frame-src 'self' https://www.googletagmanager.com; object-src 'none'; base-uri 'self'; form-action 'self'">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirm your interest | Local Coffee Shops</title>
+    <!-- Reached only from a personal email link: never index it. -->
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="theme-color" content="#2C3E50">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="stylesheet" href="/dist/styles.min.css">
+
+    <!-- Order is load-bearing: url-privacy.js removes the #token= fragment
+         from the address bar (keeping it in memory) BEFORE analytics-init.js
+         queues the consent default and gtag config, so neither page_location
+         nor a later page_referrer can carry it. Nothing is sent until the
+         person presses the button (email scanners only GET this page). -->
+    <script src="/config.js"></script>
+    <script src="/geo-consent-default.js"></script>
+    <script src="/url-privacy.js"></script>
+    <script src="/analytics-init.js"></script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-YVSXN7PM48"></script>
+    <script defer src="/consent-banner.js"></script>
+    <script defer src="/analytics-events.js"></script>
+    <script defer src="/waitlist.js"></script>
+</head>
+<body>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    <nav class="site-nav" aria-label="Main">
+        <div class="container site-nav-inner">
+            <a href="/" class="site-nav-logo">localcoffeeshops.co</a>
+            <ul class="site-nav-links">
+                <li><a href="/">Home</a></li>
+                <li><a href="/pages/states/">Coffee shops by state</a></li>
+                <li><a href="/roasters/">Roasters</a></li>
+                <li><a href="/about.html">About</a></li>
+                <li><a href="/pages/contact.html">Contact</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main id="main-content" class="container waitlist-page">
+        <h1>Confirm your interest</h1>
+        <div class="waitlist-panel" data-waitlist-confirm>
+            <p>Press the button to confirm you'd like emails about a possible monthly coffee subscription featuring local roasters. It's an interest list only: no payment, no order and no commitment, and the price, roasters and timing are not decided.</p>
+            <button type="button" class="waitlist-submit" data-action="confirm">Confirm my interest</button>
+            <p class="waitlist-status" data-status role="status" aria-live="polite"></p>
+            <div class="waitlist-alert" data-alert role="alert" hidden></div>
+            <noscript><p class="waitlist-alert">This page needs JavaScript to confirm. If you can't turn it on, please <a href="/pages/contact.html">contact us</a> and we'll do it for you.</p></noscript>
+        </div>
+        <p class="waitlist-privacy">Didn't ask for this? Just close this page and you won't be added. <a href="/pages/privacy.html#waitlist">How we handle your address</a> · <a href="/pages/contact.html">Questions or support</a></p>
+    </main>
+</body>
+</html>
