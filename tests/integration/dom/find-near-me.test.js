@@ -16,6 +16,7 @@ import enums from '../../../public/enums.js';
 import skeleton from '../../../public/skeleton.js';
 import storeMod from '../../../public/store.js';
 import api from '../../../public/api-client.js';
+import shopActions from '../../../public/shop-actions.js';
 
 const BOSTON = { latitude: 42.3601, longitude: -71.0589 };
 
@@ -75,6 +76,7 @@ describe('frontend.js — Find Near Me', () => {
     window.CoffeeShopEnums = enums;
     window.CoffeeShopSkeleton = skeleton;
     window.CoffeeShopStore = storeMod;
+    window.CoffeeShopActions = shopActions;
     window.ApiClient = api;
     Object.defineProperty(document, 'readyState', { configurable: true, value: 'complete' });
     Object.defineProperty(window, 'location', { value: new URL('http://localhost/'), writable: true });
@@ -89,6 +91,7 @@ describe('frontend.js — Find Near Me', () => {
     delete window.CoffeeShopEnums;
     delete window.CoffeeShopSkeleton;
     delete window.CoffeeShopStore;
+    delete window.CoffeeShopActions;
     delete window.ApiClient;
     delete navigator.geolocation;
     vi.restoreAllMocks();
