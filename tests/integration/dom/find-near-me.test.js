@@ -8,9 +8,9 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { http, HttpResponse } from 'msw';
+import { http, HttpResponse, delay } from 'msw';
 import { server } from '../../helpers/mockApi.js';
-import { click } from '../../helpers/dom.js';
+import { click, input } from '../../helpers/dom.js';
 
 import enums from '../../../public/enums.js';
 import skeleton from '../../../public/skeleton.js';
@@ -66,10 +66,12 @@ const results = () => [...document.querySelectorAll('#searchResults .coffee-item
 
 describe('frontend.js — Find Near Me', () => {
   let requests;
+  let statesLoaded;
 
   beforeEach(() => {
     createTestDOM();
     requests = [];
+    statesLoaded = false;
     window.CoffeeShopEnums = enums;
     window.CoffeeShopSkeleton = skeleton;
     window.CoffeeShopStore = storeMod;
@@ -96,7 +98,10 @@ describe('frontend.js — Find Near Me', () => {
   async function boot(nearbyHandler) {
     server.use(
       http.get('*/api/v1/health', () => HttpResponse.json({ success: true, data: { status: 'ok' } })),
-      http.get('*/api/v1/states', () => HttpResponse.json({ success: true, data: [] })),
+      http.get('*/api/v1/states', () => {
+        statesLoaded = true;
+        return HttpResponse.json({ success: true, data: [] });
+      }),
       nearbyHandler
     );
     vi.resetModules();
@@ -143,5 +148,40 @@ describe('frontend.js — Find Near Me', () => {
     click(document.getElementById('findNearMe'));
     await waitFor(() => expect(document.body.textContent).toMatch('Could not fetch nearby coffee shops.'));
     expect(results()).toHaveLength(0);
+    // Back to browsing by state, not an empty "Search Results" section.
+    expect(document.getElementById('searchResults').style.display).toBe('none');
+    expect(document.getElementById('stateGrid').style.display).toBe('grid');
+  });
+
+  it('restores the state grid when the browser refuses to share a location', async () => {
+    navigator.geolocation.getCurrentPosition = vi.fn((ok, err) => err({ code: 1, message: 'denied' }));
+    await boot(http.get('*/api/v1/nearby', () => HttpResponse.json({ success: true, data: [] })));
+
+    click(document.getElementById('findNearMe'));
+    await waitFor(() => expect(document.body.textContent).toMatch('Unable to retrieve your location.'));
+    expect(document.getElementById('searchResults').style.display).toBe('none');
+    expect(document.getElementById('stateGrid').style.display).toBe('grid');
+  });
+
+  it('a slow /nearby response does not overwrite a newer text search', async () => {
+    await boot(http.get('*/api/v1/nearby', async () => {
+      await delay(400);
+      return HttpResponse.json({ success: true, data: [nearbyShop(1, 'Stale Nearby Cafe', 0.4)] });
+    }));
+    server.use(http.get('*/api/v1/search', () => HttpResponse.json({
+      success: true,
+      data: [{ id: 9, displayName: { text: 'Searched Roasters' }, formattedAddress: '1 Main St, Austin, TX', state: 'TX' }],
+    })));
+    // Startup restores the search box from the URL once /states loads;
+    // type only after that, as a user would.
+    await waitFor(() => expect(statesLoaded).toBe(true));
+    await new Promise((r) => setTimeout(r, 20));
+
+    click(document.getElementById('findNearMe'));
+    input(document.getElementById('searchInput'), 'roasters');
+    await waitFor(() => expect(results().map((li) => li.querySelector('h3').textContent)).toEqual(['Searched Roasters']));
+
+    await new Promise((r) => setTimeout(r, 600)); // let the nearby response land
+    expect(results().map((li) => li.querySelector('h3').textContent)).toEqual(['Searched Roasters']);
   });
 });

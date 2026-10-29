@@ -764,27 +764,40 @@
             return;
         }
 
-        startNewSearchGeneration();
+        // Like searchCoffeeShops: a newer search supersedes this one, so a
+        // late position or /nearby response must not overwrite its results.
+        const generation = startNewSearchGeneration();
         showLoadingState();
 
+        // On failure, go back to browsing by state rather than leaving an
+        // empty "Search Results" section.
+        const fail = (error, message) => {
+            if (generation !== searchGeneration) return;
+            hideLoadingState();
+            handleError(error, 'findNearbyShops');
+            if (dom.searchResultsContainer) {
+                dom.searchResultsContainer.style.display = 'none';
+            }
+            restoreStateGridVisibility();
+            showUserError(message);
+        };
+
         navigator.geolocation.getCurrentPosition(async (position) => {
+            if (generation !== searchGeneration) return;
             const { latitude, longitude } = position.coords;
             try {
                 const shops = await fetchNearbyShops(latitude, longitude);
+                if (generation !== searchGeneration) return;
                 hideLoadingState();
                 // Subscriber on 'lastSearchResults' calls displayResults.
                 store.set('lastSearchResults', {
                     shops, total: shops.length, page: 1, hasNext: false, query: null
                 });
             } catch (error) {
-                hideLoadingState();
-                handleError(error, 'findNearbyShops');
-                showUserError('Could not fetch nearby coffee shops.');
+                fail(error, 'Could not fetch nearby coffee shops.');
             }
         }, (error) => {
-            hideLoadingState();
-            handleError(error, 'findNearbyShops');
-            showUserError('Unable to retrieve your location. Please ensure you have enabled location services.');
+            fail(error, 'Unable to retrieve your location. Please ensure you have enabled location services.');
         });
     }
 
