@@ -1,0 +1,496 @@
+{
+  "version": 1,
+  "roasters": [
+    {
+      "id": "atomic-coffee-roasters",
+      "name": "Atomic Coffee Roasters",
+      "city": "Peabody",
+      "state": "MA",
+      "website": "https://atomicroastery.com/",
+      "shopUrl": "https://atomicroastery.com/collections/all-coffee",
+      "checkedAt": "2026-10-18",
+      "sources": [
+        {
+          "url": "https://atomicroastery.com/pages/coffee-education-boston",
+          "evidence": "Classes page: \"5B Webster St, Peabody, MA 01960\"; homepage mentions \"our Peabody roastery\""
+        },
+        {
+          "url": "https://atomicroastery.com/collections/all-coffee",
+          "evidence": "Coffee collection listing 12 oz bags"
+        }
+      ],
+      "shipping": {
+        "status": "offered",
+        "sourceUrl": "https://atomicroastery.com/policies/shipping-policy",
+        "evidence": "Most orders placed on our website ship the next business day."
+      },
+      "pickup": {
+        "status": "unknown"
+      }
+    },
+    {
+      "id": "barismo",
+      "name": "barismo",
+      "city": "Arlington",
+      "state": "MA",
+      "website": "https://www.barismo.com/",
+      "shopUrl": "https://www.barismo.com/coffee",
+      "checkedAt": "2026-10-18",
+      "sources": [
+        {
+          "url": "https://www.barismo.com/locations",
+          "evidence": "Locations page: \"barismo roasting currently happens in Arlington, MA\""
+        },
+        {
+          "url": "https://www.barismo.com/coffee",
+          "evidence": "Coffee page with current coffees for online order"
+        }
+      ],
+      "shipping": {
+        "status": "offered",
+        "sourceUrl": "https://www.barismo.com/shipping",
+        "evidence": "All orders via USPS Priority Mail, which delivers 1-3 days anywhere in the U.S."
+      },
+      "pickup": {
+        "status": "unknown"
+      }
+    },
+    {
+      "id": "bolt-coffee",
+      "name": "Bolt Coffee Co.",
+      "city": "Providence",
+      "state": "RI",
+      "website": "https://www.boltcoffeeco.com/",
+      "shopUrl": "https://boltcoffee.myshopify.com/collections/single-origins",
+      "officialStore": {
+        "host": "boltcoffee.myshopify.com",
+        "linkedFrom": "https://www.boltcoffeeco.com/shop",
+        "evidence": "The official site's Shop page opens this store"
+      },
+      "checkedAt": "2026-10-18",
+      "sources": [
+        {
+          "url": "https://www.boltcoffeeco.com/contact",
+          "evidence": "Contact page: \"96 Calverley Street Providence, RI 02908\""
+        },
+        {
+          "url": "https://www.boltcoffeeco.com/shop",
+          "evidence": "The site's Shop link opens its online store (boltcoffee.myshopify.com)"
+        },
+        {
+          "url": "https://boltcoffee.myshopify.com/collections/single-origins",
+          "evidence": "\"Single Origins\" collection; options include \"Whole Bean\""
+        }
+      ],
+      "shipping": {
+        "status": "offered",
+        "sourceUrl": "https://www.boltcoffeeco.com/faqs",
+        "evidence": "We roast every Monday and Wednesday and ship Tuesday - Friday."
+      },
+      "pickup": {
+        "status": "unknown"
+      }
+    },
+    {
+      "id": "brio-coffeeworks",
+      "name": "Brio Coffeeworks",
+      "city": "Burlington",
+      "state": "VT",
+      "website": "https://www.briocoffeeworks.com/",
+      "shopUrl": "https://www.briocoffeeworks.com/collections/all-coffees",
+      "checkedAt": "2026-10-18",
+      "sources": [
+        {
+          "url": "https://www.briocoffeeworks.com/pages/contact-us",
+          "evidence": "Contact page: Roastery, Cafe & Retail at \"266 Pine Street, Suite 116 Burlington, VT 05401\""
+        },
+        {
+          "url": "https://www.briocoffeeworks.com/collections/all-coffees",
+          "evidence": "\"Collection: Coffee\" listing 12 oz and 8 oz coffees"
+        }
+      ],
+      "shipping": {
+        "status": "offered",
+        "sourceUrl": "https://www.briocoffeeworks.com/pages/faqs",
+        "evidence": "All of our coffees are shipped whole bean because it helps to preserve freshness."
+      },
+      "pickup": {
+        "status": "unknown"
+      }
+    },
+    {
+      "id": "broadsheet-coffee-roasters",
+      "name": "Broadsheet Coffee Roasters",
+      "city": "Cambridge",
+      "state": "MA",
+      "website": "https://broadsheetcoffee.com/",
+      "shopUrl": "https://broadsheetcoffee.com/collections/all-coffee",
+      "checkedAt": "2026-10-18",
+      "sources": [
+        {
+          "url": "https://broadsheetcoffee.com/pages/contact",
+          "evidence": "Contact page: \"100 Kirkland Street | Cambridge, MA 02138\""
+        },
+        {
+          "url": "https://broadsheetcoffee.com/collections/all-coffee",
+          "evidence": "\"All Coffee\" collection listing blends and single origins"
+        }
+      ],
+      "shipping": {
+        "status": "offered",
+        "sourceUrl": "https://broadsheetcoffee.com/pages/shipping-faq",
+        "evidence": "We ship online orders via USPS Ground."
+      },
+      "pickup": {
+        "status": "unknown"
+      }
+    },
+    {
+      "id": "carrier-roasting-co",
+      "name": "Carrier Roasting Co.",
+      "city": "Northfield",
+      "state": "VT",
+      "website": "https://carrierroasting.com/",
+      "shopUrl": "https://carrierroasting.com/collections/whole-bean-coffee",
+      "checkedAt": "2026-10-18",
+      "sources": [
+        {
+          "url": "https://carrierroasting.com/pages/contact-us",
+          "evidence": "Contact page: \"17 East Street Northfield, Vermont 05663\"; homepage calls it the \"flagship coffee bar and roastery\""
+        },
+        {
+          "url": "https://carrierroasting.com/collections/whole-bean-coffee",
+          "evidence": "\"Whole Bean Coffee\" collection"
+        }
+      ],
+      "shipping": {
+        "status": "offered",
+        "sourceUrl": "https://carrierroasting.com/",
+        "evidence": "FREE SHIPPING ON ALL ORDERS +$40 - USE Code ShiP40"
+      },
+      "pickup": {
+        "status": "unknown"
+      }
+    },
+    {
+      "id": "coffee-by-design",
+      "name": "Coffee By Design",
+      "city": "Portland",
+      "state": "ME",
+      "website": "https://coffeebydesign.com/",
+      "shopUrl": "https://coffeebydesign.com/collections/coffee",
+      "checkedAt": "2026-10-18",
+      "sources": [
+        {
+          "url": "https://coffeebydesign.com/pages/our-roastery",
+          "evidence": "Roastery page: in the Diamond Street building, \"1 Diamond Street Portland, ME 04101\""
+        },
+        {
+          "url": "https://coffeebydesign.com/collections/coffee",
+          "evidence": "Coffee collection; products offer a \"Whole Bean\" option"
+        }
+      ],
+      "shipping": {
+        "status": "offered",
+        "sourceUrl": "https://coffeebydesign.com/pages/faqs",
+        "evidence": "We will ship all orders within two business days of your placing the order with Coffee By Design."
+      },
+      "pickup": {
+        "status": "unknown"
+      }
+    },
+    {
+      "id": "fazenda-coffee-roasters",
+      "name": "Fazenda Coffee Roasters",
+      "city": "Dedham",
+      "state": "MA",
+      "website": "https://www.fazendacoffee.com/",
+      "shopUrl": "https://www.fazendacoffee.com/collections/coffee",
+      "checkedAt": "2026-10-18",
+      "sources": [
+        {
+          "url": "https://www.fazendacoffee.com/pages/contact-us",
+          "evidence": "Contact page: \"Our roasting operations are at 95 Commerce Way, Dedham.\" and \"Our Boston MA based roastery\""
+        },
+        {
+          "url": "https://www.fazendacoffee.com/collections/coffee",
+          "evidence": "Coffee collection; product pages list \"WHOLE BEAN COFFEE\" in 12 oz. and 5 lb. bags"
+        }
+      ],
+      "shipping": {
+        "status": "offered",
+        "sourceUrl": "https://www.fazendacoffee.com/policies/shipping-policy",
+        "evidence": "We ship orders Monday through Friday; orders are fulfilled and packed in the AM."
+      },
+      "pickup": {
+        "status": "offered",
+        "sourceUrl": "https://www.fazendacoffee.com/pages/contact-us",
+        "evidence": "Local pickup is available for online orders; please allow 24 hours for an order to be prepared."
+      }
+    },
+    {
+      "id": "flight-coffee-co",
+      "name": "Flight Coffee Co.",
+      "city": "Bedford",
+      "state": "NH",
+      "website": "https://flightcoffeeco.com/",
+      "shopUrl": "https://flightcoffeeco.com/collections/single-origin-coffees",
+      "checkedAt": "2026-10-18",
+      "sources": [
+        {
+          "url": "https://flightcoffeeco.com/pages/bedford-2026",
+          "evidence": "Location page: \"Bedford, NH Cafe & Roasting Lab\""
+        },
+        {
+          "url": "https://flightcoffeeco.com/collections/single-origin-coffees",
+          "evidence": "Single-origin coffee collection; products in 12oz, 2lb and 5 lb sizes"
+        }
+      ],
+      "shipping": {
+        "status": "offered",
+        "sourceUrl": "https://flightcoffeeco.com/pages/ns-roast-days-and-shipping-information",
+        "evidence": "Orders are shipped Monday – Friday (holidays excepted)."
+      },
+      "pickup": {
+        "status": "offered",
+        "sourceUrl": "https://flightcoffeeco.com/pages/ns-roast-days-and-shipping-information",
+        "evidence": "We offer free local pickup of any order placed on our Website at our Bedford, NH café & roastery location."
+      }
+    },
+    {
+      "id": "george-howell-coffee",
+      "name": "George Howell Coffee",
+      "city": "Acton",
+      "state": "MA",
+      "website": "https://georgehowellcoffee.com/",
+      "shopUrl": "https://georgehowellcoffee.com/collections/all-coffee",
+      "checkedAt": "2026-10-18",
+      "sources": [
+        {
+          "url": "https://georgehowellcoffee.com/pages/contact-us",
+          "evidence": "Contact page: \"Roastery George Howell Coffee 312 School Street Acton, MA 01720\""
+        },
+        {
+          "url": "https://georgehowellcoffee.com/collections/all-coffee",
+          "evidence": "\"All Coffee\" collection listing bagged coffees"
+        }
+      ],
+      "shipping": {
+        "status": "offered",
+        "sourceUrl": "https://georgehowellcoffee.com/pages/frequently-asked-questions-2",
+        "evidence": "We ship Monday-Friday, excluding holidays and extreme weather issues."
+      },
+      "pickup": {
+        "status": "unknown"
+      }
+    },
+    {
+      "id": "little-wolf-coffee",
+      "name": "Little Wolf Coffee Roasters",
+      "city": "Ipswich",
+      "state": "MA",
+      "website": "https://littlewolf.coffee/",
+      "shopUrl": "https://littlewolf.coffee/collections/coffee",
+      "checkedAt": "2026-10-18",
+      "sources": [
+        {
+          "url": "https://littlewolf.coffee/",
+          "evidence": "Homepage: \"Our Cafe and Roastery 129 High Street Ipswich, MA 01938\""
+        },
+        {
+          "url": "https://littlewolf.coffee/collections/coffee",
+          "evidence": "\"Shop Coffee\" collection listing coffees"
+        }
+      ],
+      "shipping": {
+        "status": "offered",
+        "sourceUrl": "https://littlewolf.coffee/pages/faq",
+        "evidence": "orders ship (or are ready for pickup at our cafe) the day after."
+      },
+      "pickup": {
+        "status": "offered",
+        "sourceUrl": "https://littlewolf.coffee/pages/faq",
+        "evidence": "Pickup orders are typically ready by 10am the day after your coffee was roasted."
+      }
+    },
+    {
+      "id": "new-harvest-coffee-roasters",
+      "name": "New Harvest Coffee Roasters",
+      "city": "Providence",
+      "state": "RI",
+      "website": "https://newharvestcoffee.com/",
+      "shopUrl": "https://newharvestcoffee.com/collections/coffee",
+      "checkedAt": "2026-10-18",
+      "sources": [
+        {
+          "url": "https://newharvestcoffee.com/pages/visit-us",
+          "evidence": "Visit page: Roastery/HQ at \"10 Sims Ave., Unit 101, Providence, RI 02909\""
+        },
+        {
+          "url": "https://newharvestcoffee.com/collections/coffee",
+          "evidence": "Coffee collection; products offered as 12 oz bags, whole bean"
+        }
+      ],
+      "shipping": {
+        "status": "offered",
+        "sourceUrl": "https://newharvestcoffee.com/",
+        "evidence": "Free Shipping on Orders $75+"
+      },
+      "pickup": {
+        "status": "offered",
+        "sourceUrl": "https://newharvestcoffee.com/pages/visit-us",
+        "evidence": "Ordering beans for pickup? This is also where you can pick them up"
+      }
+    },
+    {
+      "id": "rare-breed-coffee",
+      "name": "Rare Breed Coffee",
+      "city": "Nashua",
+      "state": "NH",
+      "website": "https://rarebreedcoffee.com/",
+      "shopUrl": "https://store.rarebreedcoffee.com/collections/coffee",
+      "checkedAt": "2026-10-18",
+      "sources": [
+        {
+          "url": "https://rarebreedcoffee.com/",
+          "evidence": "Footer: \"NASHUA ROASTING HQ 2 Pittsburgh Avenue Nashua, NH 03062\""
+        },
+        {
+          "url": "https://store.rarebreedcoffee.com/pages/frequently-asked-questions",
+          "evidence": "FAQ: \"We were A&E Coffee\" and rebranded in October 2023"
+        },
+        {
+          "url": "https://store.rarebreedcoffee.com/collections/coffee",
+          "evidence": "Coffee collection: \"available as whole bean or ground\""
+        }
+      ],
+      "shipping": {
+        "status": "offered",
+        "sourceUrl": "https://store.rarebreedcoffee.com/pages/shipping-return-policy",
+        "evidence": "Our goal is to ship orders within 1-2 business days."
+      },
+      "pickup": {
+        "status": "unknown"
+      }
+    },
+    {
+      "id": "speckled-ax",
+      "name": "Speckled Ax",
+      "city": "Portland",
+      "state": "ME",
+      "website": "https://speckledax.com/",
+      "shopUrl": "https://speckledax.com/shop/",
+      "checkedAt": "2026-10-18",
+      "sources": [
+        {
+          "url": "https://speckledax.com/locations/",
+          "evidence": "Locations page: \"Back Cove/Roastery\" at 135 Walton Street, Portland, ME"
+        },
+        {
+          "url": "https://speckledax.com/shop/",
+          "evidence": "Shop page of wood-roasted coffees sold in 12 oz, 2 lb and 5 lb bags"
+        }
+      ],
+      "shipping": {
+        "status": "offered",
+        "sourceUrl": "https://speckledax.com/policies/",
+        "evidence": "We roast to order, mark each bag with a roasting date, and generally ship within hours"
+      },
+      "pickup": {
+        "status": "unknown"
+      }
+    },
+    {
+      "id": "speedwell-coffee",
+      "name": "Speedwell Coffee",
+      "city": "Plymouth",
+      "state": "MA",
+      "website": "https://speedwellcoffee.com/",
+      "shopUrl": "https://speedwellcoffee.com/collections/coffee",
+      "checkedAt": "2026-10-18",
+      "sources": [
+        {
+          "url": "https://speedwellcoffee.com/",
+          "evidence": "Homepage: \"208 South Meadow Rd. Plymouth, MA 02360\""
+        },
+        {
+          "url": "https://speedwellcoffee.com/collections/coffee",
+          "evidence": "Coffee collection with a whole bean filter"
+        }
+      ],
+      "shipping": {
+        "status": "offered",
+        "sourceUrl": "https://speedwellcoffee.com/policies/shipping-policy",
+        "evidence": "Single bags of coffee will ship via First Class Mail. Multiple bags of coffee will ship via Priority Mail."
+      },
+      "pickup": {
+        "status": "offered",
+        "sourceUrl": "https://speedwellcoffee.com/policies/shipping-policy",
+        "evidence": "Local pickup is available at our Plymouth roastery on orders placed before 2PM Monday through Friday."
+      }
+    },
+    {
+      "id": "tandem-coffee-roasters",
+      "name": "Tandem Coffee Roasters",
+      "city": "Portland",
+      "state": "ME",
+      "website": "https://www.tandemcoffee.com/",
+      "shopUrl": "https://www.tandemcoffee.com/collections/coffees",
+      "checkedAt": "2026-10-18",
+      "sources": [
+        {
+          "url": "https://www.tandemcoffee.com/pages/contact",
+          "evidence": "Contact page: \"Café + Roastery 122 Anderson St Portland, ME 04101\""
+        },
+        {
+          "url": "https://www.tandemcoffee.com/collections/coffees",
+          "evidence": "Coffees collection: \"Whole bean coffees\", 12 oz bags"
+        }
+      ],
+      "shipping": {
+        "status": "offered",
+        "sourceUrl": "https://www.tandemcoffee.com/policies/shipping-policy",
+        "evidence": "FREE Standard Shipping for orders over $50 within the contiguous U.S."
+      },
+      "pickup": {
+        "status": "offered",
+        "sourceUrl": "https://www.tandemcoffee.com/policies/shipping-policy",
+        "evidence": "Orders designated \"Local Pickup\" will be available on the day after they are roasted at our cafe"
+      }
+    },
+    {
+      "id": "wayfarer-coffee-roasters",
+      "name": "Wayfarer Coffee Roasters",
+      "city": "Laconia",
+      "state": "NH",
+      "website": "https://www.wayfarerroasters.com/",
+      "shopUrl": "https://2ac197-3.myshopify.com/pages/coffee",
+      "officialStore": {
+        "host": "2ac197-3.myshopify.com",
+        "linkedFrom": "https://www.wayfarerroasters.com/roastery",
+        "evidence": "Roastery page: \"AVAILABLE FOR PURCHASE ... ON OUR ONLINE STORE!\" with a Shop now link to this store"
+      },
+      "checkedAt": "2026-10-18",
+      "sources": [
+        {
+          "url": "https://www.wayfarerroasters.com/roastery",
+          "evidence": "Roastery page: \"roasted on site at our roasting facility in Laconia\"; links to the online store"
+        },
+        {
+          "url": "https://www.wayfarerroasters.com/contact",
+          "evidence": "Contact page lists cafe addresses in \"Laconia, NH 03246\""
+        },
+        {
+          "url": "https://2ac197-3.myshopify.com/pages/coffee",
+          "evidence": "Online store \"All Coffee\" page listing 12oz coffees"
+        }
+      ],
+      "shipping": {
+        "status": "unknown"
+      },
+      "pickup": {
+        "status": "unknown"
+      }
+    }
+  ]
+}

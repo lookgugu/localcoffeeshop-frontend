@@ -136,6 +136,18 @@ API_BASE_URL=http://localhost:3000/api/v1
 npm test
 ```
 
+### Roaster directory (`/roasters/`)
+
+A curated, non-exhaustive list of roasters that sell packaged beans on their
+own websites, kept in `data/roasters.json` (no database). `npm run build`
+validates it and generates `public/roasters/index.html` (not committed);
+`npm run check:roasters` runs only the checker (CI does too). The checker
+rejects unsafe or non-official URLs, duplicates, missing sources/check dates,
+unexpected fields, and shipping/pickup marked "offered" without a quote from
+the roaster's own site (otherwise use `{ "status": "unknown" }`).
+`npm run qa:roasters` is a local Playwright check of the page (port 8188,
+all external requests blocked).
+
 ## Deployment
 
 ### DigitalOcean App Platform
@@ -173,3 +185,79 @@ A meta tag can't provide `frame-ancestors`, `X-Frame-Options` or
 ## License
 
 MIT
+
+### Roaster-subscription interest list and analytics privacy
+
+An inline, interest-only form (no price, checkout or launch promise) on the
+homepage and `/roasters/`. The markup comes from `scripts/waitlist-markup.cjs`
+(the homepage carries a verbatim copy that a test checks for drift), and
+`public/waitlist.js` adds the behaviour. The consent box starts unchecked.
+A successful submit means **pending**: the person is asked to check their
+inbox, and the backend only adds them after they press "Confirm my interest"
+on `/waitlist/confirm/`. Opening that page sends nothing. `/waitlist/unsubscribe/`
+works the same way. Links carry the token in the URL fragment. Backend
+contract: see the backend repo's `docs/waitlist.md`. The API returns 503
+until it is configured.
+
+- `public/url-privacy.js` is a parser-blocking script that runs before the
+  gtag config on EVERY page that loads the Google tag (homepage, state,
+  submit, about, 404, `/roasters/`, `/waitlist/*`; `tests/unit/analytics-pages.test.js`
+  enforces it). It removes search text (`q` and similar), tokens and anything
+  containing `@` from the address bar (case-insensitive, query and fragment,
+  empty `token=` included). Pages receive these values in memory, once.
+  Search keeps only `state`/`price` in the URL.
+- `public/analytics-init.js` is the only place the tag is configured. Its
+  first `config` passes explicit sanitised `page_location` and
+  `page_referrer` from `url-privacy.js`: gtag would otherwise send
+  `document.referrer` as-is, and a same-origin referrer can carry `?q=` or an
+  email. **Fail closed**: if the helper is missing, blocked, throws or returns
+  anything unexpected, the tag is not configured and
+  `window['ga-disable-G-YVSXN7PM48']` is set, so nothing is sent (the
+  `gtag.js` file may still load; no raw fallback).
+- `public/analytics-events.js` provides `LcsAnalytics.track(name, params)`.
+  It sends only allowlisted events and parameters (categories and counts)
+  with an explicit `send_to: 'G-YVSXN7PM48'`.
+
+#### Metric semantics (read before reporting)
+
+These are different things: **never sum them**.
+
+| Metric | Meaning |
+| --- | --- |
+| `directory_search` | A person ran a homepage search (settled, once per distinct search). A deep-linked initial render is not a search and is not counted. |
+| `roaster_filter` | A person changed a `/roasters/` filter (debounced, distinct). The initial render is not counted. |
+| **Bean-store click** = GA4 enhanced-measurement outbound **`click`** | The one canonical metric. Report it filtered by event `click`, `link_classes` = `roaster-shop` and `link_url` = the catalog merchant URL (`shopUrl` in `data/roasters.json`). `link_classes` = `roaster-site` is the roaster's official website link. There is deliberately no custom `bean_store_click` event (it would double count). No GA admin setting is changed or required beyond enhanced measurement being on, and nothing hacks the Google script or linker. If enhanced measurement is turned off in GA admin, there is no bean-store click metric until it is turned on again. |
+| `waitlist_signup_attempt` | The form sent a request. |
+| `waitlist_request_accepted` | The backend answered **202 `pending_confirmation`**. That is a request accepted, **not** an email sent: the backend answers the same 202 for honeypot, suppressed and globally-unsubscribed addresses and sends nothing (anti-enumeration), so a browser can never know. The real provider hand-off is the backend's `waitlist_confirmation_sent` log (written only after `sendEmail`), never a browser conversion. Renamed from `waitlist_signup_accepted`. |
+| `waitlist_signup_error` | The request failed (`error_code` says why). |
+| `waitlist_confirmed` | The backend answered `confirmed` with `conversion: observed_new` to an explicit confirm POST. **Known limitation: not globally unique.** Resend has no conditional add, so two API instances racing on one token can both observe `observed_new`; single-process double clicks are collapsed. `confirmed`+`ambiguous`, `already_confirmed`, `suppressed` and replays are never counted. Do not report it as a unique-conversion count. |
+| GA `page_view`, `form_start`, `scroll` | Diagnostics, not intent and not conversions. `page_view` also fires for history changes (the state/price URL mirror) and `form_start` when someone first touches a form. Never add them to the metrics above. |
+
+#### Consent Mode and privacy
+
+Consent Mode is unchanged: ads are denied by default; analytics storage is
+denied for visitors who look to be in Europe/UK/Switzerland, a California or
+UTC time zone, and granted elsewhere until a choice is made (saved consent
+wins, before the first config). When analytics storage is denied, Google's
+tag can still send limited **cookieless pings** (`gcs=G100`, no analytics
+cookie). This is not basic mode, and the privacy policy says so.
+`url_passthrough` is not enabled.
+
+#### Browser QA (`npm run qa:waitlist`, port 8189)
+
+Installs a default-deny route before the first navigation and blocks service
+workers. `/config.js` is served from memory from two **immutable fixtures**,
+and the whole suite runs once per fixture: `tracked-development` (what git
+tracks: `localhost:3000`, `development`) and `generated-production` (what
+`npm run build:config` emits). Every scenario asserts in the page that
+`window.APP_CONFIG` equals the fixture and that every API request went to its
+origin. The real `gtag.js` loads; every GA collect request on any host
+(including `sendBeacon`) is intercepted and answered locally, and the collect
+URLs and bodies, the spied beacon/fetch/XHR calls and the full URLs and bodies
+of blocked Google requests are all scanned for emails, tokens and search text.
+Scenarios include a dirty same-origin referrer, dirty direct loads of the
+state/about/404/submit/unsubscribe pages, the privacy helper blocked (nothing
+is sent), consent helper blocked, strict-region default, live Reject All,
+analytics blocked, and exactly one canonical outbound click. `public/config.js`
+and `git status` are checked unchanged at the end. `QA_OUT_DIR=<dir>` keeps
+screenshots (per mode) and a JSON of the captured hits.

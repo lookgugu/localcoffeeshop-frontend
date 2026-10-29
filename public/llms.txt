@@ -10,6 +10,7 @@ Local Coffee Shops (https://localcoffeeshop.co) is a free directory that helps p
 - [About](https://localcoffeeshop.co/about.html): Who we are and our mission to support local coffee shops.
 - [Submit a shop](https://localcoffeeshop.co/submit.html): Add a local coffee shop to the directory.
 - [Contact](https://localcoffeeshop.co/pages/contact.html): Get in touch with the team.
+- [Coffee roasters](https://localcoffeeshop.co/roasters/): A curated, non-exhaustive list of coffee roasters that sell packaged beans on their own websites, starting with Massachusetts and New England. Each entry links to the roaster's official site and bean shop, with the pages used as sources and the date they were checked; shipping and pickup are shown only where the roaster's site states them.
 
 ## Browse by state
 

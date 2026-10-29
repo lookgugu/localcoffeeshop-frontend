@@ -1,0 +1,22 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test -- --run
+      # Curated roaster data (data/roasters.json): schema, provenance, safe
+      # URLs, duplicates. The build runs it too; this names the failure.
+      - run: npm run check:roasters
+      # NODE_ENV and API_BASE_URL are unset, so this is a local build: the
+      # state prerender skips instead of calling the rate-limited API (#24).
+      - run: npm run build

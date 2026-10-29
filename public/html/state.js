@@ -18,10 +18,14 @@ if (!window.ApiClient) {
 if (!window.CoffeeShopStore) {
     throw new Error('window.CoffeeShopStore not loaded — check script order in HTML');
 }
+if (!window.CoffeeShopActions) {
+    throw new Error('window.CoffeeShopActions not loaded — check script order in HTML');
+}
 const { stateName, isStateCode, Price } = window.CoffeeShopEnums;
 const { createSkeletonItem } = window.CoffeeShopSkeleton;
 const api = window.ApiClient;
 const { createStore } = window.CoffeeShopStore;
+const { createShopActions } = window.CoffeeShopActions;
 
 // Shops requested per API page. The API defaults to 100 and caps at 500.
 // We load one page up front and fetch further pages on demand ("Load more"):
@@ -272,6 +276,10 @@ function renderShops(shops) {
             span.setAttribute('aria-label', 'Price level: ' + priceLabel);
             li.appendChild(span);
         }
+
+        // Directions (and the shop's website, when the API has a safe one).
+        const actions = createShopActions(document, shop);
+        if (actions) li.appendChild(actions);
 
         shopElements.set(shop, li);
         fragment.appendChild(li);

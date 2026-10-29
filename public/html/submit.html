@@ -36,37 +36,14 @@
     <link rel="stylesheet" href="../submit-styles.css">
     <script src="/config.js"></script>
 
-    <!-- Google Consent Mode default must be queued before gtag config. -->
+    <!-- Order is load-bearing: the consent default is queued first, then
+         url-privacy.js scrubs the address bar, then analytics-init.js
+         configures the tag with sanitised page_location / page_referrer (and
+         does not configure it at all if that helper is unavailable). -->
     <script src="/geo-consent-default.js"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      var initialConsent = {
-        analytics_storage: 'denied',
-        ad_storage: 'denied',
-        ad_user_data: 'denied',
-        ad_personalization: 'denied',
-        functionality_storage: 'granted',
-        security_storage: 'granted',
-        wait_for_update: 500
-      };
-      try {
-        if (window.LocalCoffeeShopConsent) {
-          initialConsent = window.LocalCoffeeShopConsent.getInitialConsentState();
-        }
-      } catch (e) {}
-      gtag('consent', 'default', initialConsent);
-    </script>
-
-    <!-- Google tag (gtag.js) -->
+    <script src="/url-privacy.js"></script>
+    <script src="/analytics-init.js"></script>
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-YVSXN7PM48"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-
-      gtag('config', 'G-YVSXN7PM48');
-    </script>
     <script src="/consent-banner.js"></script>
     <script src="/enums.js"></script>
     <script src="/api-client.js"></script>
@@ -83,7 +60,7 @@
 
         <div class="tab-content active" id="add-tab">
             <div class="form-container">
-                <div class="success-message" id="add-success">Coffee shop added successfully!</div>
+                <div class="success-message" id="add-success">Thanks! Your coffee shop has been submitted for review. It won't appear in the directory unless a moderator approves it.</div>
                 <div class="error-message" id="add-error"></div>
 
                 <form id="add-form">
@@ -161,7 +138,7 @@
 
         <div class="tab-content" id="update-tab">
             <div class="form-container">
-                <div class="success-message" id="update-success">Coffee shop updated successfully!</div>
+                <div class="success-message" id="update-success">Thanks! Your changes have been submitted for review. The listing won't change unless a moderator approves them.</div>
                 <div class="error-message" id="update-error"></div>
 
                 <div class="form-group">

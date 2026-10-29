@@ -29,6 +29,7 @@ const SHARED = [
     'skeleton.js',
     'api-client.js',
     'store.js',
+    'shop-actions.js',
 ];
 
 // Bundle URLs must never reuse a URL an earlier deploy served with different

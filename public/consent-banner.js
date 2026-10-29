@@ -53,8 +53,8 @@
             gtag('consent', 'default', defaultConsent);
         }
 
-        // Enable URL passthrough for better measurement without cookies
-        gtag('set', 'url_passthrough', true);
+        // url_passthrough is deliberately NOT enabled: it would append
+        // Google click identifiers to internal links while consent is denied.
 
         // Enable ads data redaction when consent denied
         gtag('set', 'ads_data_redaction', true);
@@ -268,10 +268,15 @@
         banner.classList.add('consent-banner-visible');
         banner.removeAttribute('aria-hidden');
 
-        // Focus on the banner for accessibility
+        // Move focus to the banner for accessibility, but only if nothing else
+        // has focus by then: never steal it from a form someone is using.
         const firstButton = banner.querySelector('.consent-btn-accept');
         if (firstButton) {
-            setTimeout(() => firstButton.focus(), CONFIG.ANIMATION_DURATION);
+            setTimeout(() => {
+                const active = document.activeElement;
+                const idle = !active || active === document.body || active === document.documentElement;
+                if (idle) firstButton.focus();
+            }, CONFIG.ANIMATION_DURATION);
         }
     }
 

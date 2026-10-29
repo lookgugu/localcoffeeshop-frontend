@@ -1,0 +1,157 @@
+/* Roaster-subscription interest form (scripts/waitlist-markup.cjs) and the
+   /waitlist/confirm/ + /waitlist/unsubscribe/ pages (public/waitlist/). */
+
+.waitlist,
+.waitlist-panel {
+    max-width: 640px;
+    margin: 32px auto;
+    padding: 20px;
+    background-color: #fff;
+    border: 1px solid #d7dde3;
+    border-radius: 8px;
+}
+
+.waitlist h2 {
+    margin-top: 0;
+    font-size: 1.3rem;
+    color: #2c3e50;
+}
+
+.waitlist-fine,
+.waitlist-privacy {
+    font-size: 0.95rem;
+    color: #4a5560; /* 7.2:1 on white */
+}
+
+.waitlist-field {
+    margin: 16px 0;
+}
+
+.waitlist-field label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.waitlist-field input[type="email"] {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 12px;
+    font-size: 1rem;
+    border: 1px solid #6b7680;
+    border-radius: 4px;
+}
+
+.waitlist-consent {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4px 10px;
+    align-items: start;
+}
+
+.waitlist-consent input[type="checkbox"] {
+    width: 22px;
+    height: 22px;
+    margin: 2px 0 0;
+}
+
+.waitlist-consent label {
+    font-weight: 400;
+    margin: 0;
+}
+
+.waitlist-consent .waitlist-field-error {
+    grid-column: 1 / -1;
+}
+
+.waitlist-field input[aria-invalid="true"] {
+    border-color: #b42318;
+    box-shadow: 0 0 0 1px #b42318;
+}
+
+.waitlist-field-error {
+    margin: 6px 0 0;
+    color: #b42318; /* 6.1:1 on white */
+    font-weight: 600;
+}
+
+.waitlist-alert {
+    padding: 10px 12px;
+    border: 1px solid #b42318;
+    border-radius: 4px;
+    background-color: #fef3f2;
+    color: #8a1c12;
+}
+
+.waitlist-alert[hidden],
+.waitlist-field-error[hidden],
+.waitlist-success[hidden] {
+    display: none;
+}
+
+.waitlist-submit {
+    min-height: 44px;
+    padding: 10px 20px;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #fff;
+    background-color: #2c3e50;
+    border: 0;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.waitlist-submit:hover {
+    background-color: #1f2d3a;
+}
+
+.waitlist-submit:disabled {
+    opacity: 0.7;
+    cursor: progress;
+}
+
+.waitlist-status:empty {
+    display: none;
+}
+
+.waitlist-success {
+    padding: 12px 16px;
+    border-left: 4px solid #1e7a3c;
+    background-color: #f0f9f3;
+}
+
+.waitlist-success h3 {
+    margin-top: 0;
+}
+
+/* Honeypot: off-screen for people, still present for naive bots. */
+.waitlist-hp {
+    position: absolute;
+    left: -10000px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+}
+
+.waitlist a:focus-visible,
+.waitlist input:focus-visible,
+.waitlist button:focus-visible,
+.waitlist-success:focus-visible,
+.waitlist-page a:focus-visible,
+.waitlist-page button:focus-visible {
+    outline: 3px solid #1d4ed8;
+    outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+    .waitlist,
+    .waitlist-panel {
+        margin: 24px 0;
+        padding: 16px;
+    }
+
+    .waitlist-submit {
+        width: 100%;
+    }
+}
