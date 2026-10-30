@@ -60,6 +60,8 @@ This will:
 1. Generate `public/config.js` with environment variables
 2. Minify JavaScript files to `public/dist/`
 3. Minify CSS files to `public/dist/`
+4. Copy the pages, prerender the state pages, roasters page and sitemap
+5. Optimize the homepage for mobile (`scripts/optimize-home.cjs`): prerender the state grid from the API's `/states` and inline the stylesheet and `config.js`, so first paint needs no API call or extra round trip
 
 ## Project Structure
 

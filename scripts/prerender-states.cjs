@@ -550,6 +550,7 @@ module.exports = {
     renderStatePages,
     renderIndexPage,
     renderHead,
+    fetchEnvelope,
     fetchStateShops,
     rateLimitWaitMs,
     mapWithConcurrency,

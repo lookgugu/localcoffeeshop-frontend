@@ -327,12 +327,13 @@
     }
 
     /**
-     * Initial data load: health check, then the state list. On failure the
-     * page explains why and offers a retry (#25). Returns true on success.
+     * Initial data load: the state list. On failure the page explains why and
+     * offers a retry (#25). Returns true on success. No separate /health call
+     * first: /states fails the same ways, and the extra cross-origin round
+     * trip delayed the grid by one mobile RTT.
      */
     async function loadDirectory() {
         try {
-            await api.get('/health');
             await initializeStateList();
         } catch (error) {
             handleError(error, 'loadDirectory');

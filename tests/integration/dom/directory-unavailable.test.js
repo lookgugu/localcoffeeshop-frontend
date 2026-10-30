@@ -1,8 +1,7 @@
 /**
  * Integration Tests — homepage when the initial API load fails (#25)
  *
- * Boots the real public/frontend.js against msw. When /health or /states
- * fails, the search box and both filters can't work, so they must be
+ * Boots the real public/frontend.js against msw. When /states fails, the search box and both filters can't work, so they must be
  * disabled (and say why), the message must reflect the cause (rate limit vs
  * server error vs offline/network) without claiming an outage for every
  * failure, a "Try again" button must recover without duplicating listeners
@@ -61,7 +60,6 @@ const controls = () => [$('searchInput'), $('stateFilter'), $('priceFilter')];
 const status = () => $('serverStatus');
 const retryButton = () => status().querySelector('button.retry-button');
 
-const health = () => http.get('*/api/v1/health', () => HttpResponse.json({ success: true, data: { status: 'ok' } }));
 const statesOk = () => http.get('*/api/v1/states', () => HttpResponse.json({ success: true, data: fixtureStates }));
 const statesStatus = (code) => http.get('*/api/v1/states', () =>
   HttpResponse.json({ success: false, error: { message: 'nope' } }, { status: code }));
@@ -123,7 +121,7 @@ describe('frontend.js — initial API failure (#25)', () => {
   }
 
   it('server error (5xx): disables search/filters, explains it as a server problem, offers retry + static directory', async () => {
-    await boot(health(), statesStatus(503));
+    await boot(statesStatus(503));
     await waitFor(() => expect(retryButton()).not.toBeNull());
 
     expectUnavailable();
@@ -137,7 +135,7 @@ describe('frontend.js — initial API failure (#25)', () => {
   });
 
   it('rate limit (429): says so, and does not claim the server is down or unreachable', async () => {
-    await boot(health(), statesStatus(429));
+    await boot(statesStatus(429));
     await waitFor(() => expect(retryButton()).not.toBeNull());
 
     expectUnavailable();
@@ -149,7 +147,7 @@ describe('frontend.js — initial API failure (#25)', () => {
 
   it('offline (network error while navigator.onLine is false): says the device appears offline', async () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
-    await boot(http.get('*/api/v1/health', () => HttpResponse.error()));
+    await boot(http.get('*/api/v1/states', () => HttpResponse.error()));
     await waitFor(() => expect(retryButton()).not.toBeNull());
 
     expectUnavailable();
@@ -157,7 +155,7 @@ describe('frontend.js — initial API failure (#25)', () => {
   });
 
   it('network error while online: says the server could not be reached, without claiming the user is offline', async () => {
-    await boot(http.get('*/api/v1/health', () => HttpResponse.error()));
+    await boot(http.get('*/api/v1/states', () => HttpResponse.error()));
     await waitFor(() => expect(retryButton()).not.toBeNull());
 
     expectUnavailable();
@@ -174,7 +172,7 @@ describe('frontend.js — initial API failure (#25)', () => {
       if (statesCalls <= 8) return HttpResponse.json({ success: false }, { status: 500 });
       return HttpResponse.json({ success: true, data: fixtureStates });
     });
-    await boot(health(), flaky);
+    await boot(flaky);
     await waitFor(() => expect(retryButton()).not.toBeNull());
 
     // First retry fails again: still unavailable, button usable again.
@@ -204,7 +202,11 @@ describe('frontend.js — initial API failure (#25)', () => {
   });
 
   it('a healthy load leaves the controls enabled and the status hidden', async () => {
-    await boot(health(), statesOk());
+    let healthCalls = 0;
+    await boot(statesOk(), http.get('*/api/v1/health', () => {
+      healthCalls += 1;
+      return HttpResponse.json({ success: true, data: { status: 'ok' } });
+    }));
     await waitFor(() => expect(document.querySelectorAll('#stateGrid .state-card')).toHaveLength(fixtureStates.length));
 
     for (const el of controls()) {
@@ -213,5 +215,7 @@ describe('frontend.js — initial API failure (#25)', () => {
     }
     expect(status().style.display).toBe('none');
     expect(retryButton()).toBeNull();
+    // No serial /health round trip before /states: it delayed the grid by one mobile RTT.
+    expect(healthCalls).toBe(0);
   });
 });
