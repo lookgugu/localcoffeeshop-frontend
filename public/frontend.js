@@ -46,6 +46,7 @@
         // the next API page once those run out.
         SEARCH_API_PAGE_SIZE: 100,
         NEARBY_LIMIT: 50, // shops returned by "Find Near Me" (API max 100)
+        KM_PER_MILE: 1.609344,
         // Pages to skip past when a whole API page fails validation.
         MAX_SKIPPED_PAGES: 3,
 
@@ -464,6 +465,8 @@
      */
     function displayResults(results) {
         if (!dom.searchResultsContainer || results == null) return;
+        // Only nearby results come with the map and distance controls.
+        if (!results.nearby) hideNearbyPanel();
         const { shops, total, page, hasNext, query } = results;
         const rejected = results.rejected || 0;
 
@@ -888,6 +891,18 @@
         }
     }
 
+    // ============================================================================
+    // FIND NEAR ME — list, map and distance filter (#30)
+    // ============================================================================
+
+    // The last nearby result: { origin: {lat, lon}, shops, radiusMi }. Kept
+    // so the distance chips can re-filter without another request.
+    let nearby = null;
+    // Map center after the visitor pans, offered as "Search this area".
+    let pendingAreaCenter = null;
+    // Created on first use; null if the map module didn't load.
+    let nearbyMap = null;
+
     async function findNearbyShops() {
         if (!navigator.geolocation) {
             showUserError('Geolocation is not supported by your browser.');
@@ -899,36 +914,110 @@
         const generation = startNewSearchGeneration();
         showLoadingState();
 
-        // On failure, go back to browsing by state rather than leaving an
-        // empty "Search Results" section.
-        const fail = (error, message) => {
-            if (generation !== searchGeneration) return;
-            hideLoadingState();
-            handleError(error, 'findNearbyShops');
-            if (dom.searchResultsContainer) {
-                dom.searchResultsContainer.style.display = 'none';
-            }
-            restoreStateGridVisibility();
-            showUserError(message);
-        };
-
-        navigator.geolocation.getCurrentPosition(async (position) => {
+        navigator.geolocation.getCurrentPosition((position) => {
             if (generation !== searchGeneration) return;
             const { latitude, longitude } = position.coords;
-            try {
-                const shops = await fetchNearbyShops(latitude, longitude);
-                if (generation !== searchGeneration) return;
-                hideLoadingState();
-                // Subscriber on 'lastSearchResults' calls displayResults.
-                store.set('lastSearchResults', {
-                    shops, total: shops.length, page: 1, hasNext: false, query: null
-                });
-            } catch (error) {
-                fail(error, 'Could not fetch nearby coffee shops.');
-            }
+            loadNearby({ lat: latitude, lon: longitude }, generation);
         }, (error) => {
-            fail(error, 'Unable to retrieve your location. Please ensure you have enabled location services.');
+            nearbyFailed(generation, error, 'Unable to retrieve your location. Please ensure you have enabled location services.');
         });
+    }
+
+    /** Re-run the nearby search around where the visitor moved the map. */
+    function searchThisArea() {
+        if (!pendingAreaCenter) return;
+        const center = pendingAreaCenter;
+        pendingAreaCenter = null;
+        if (dom.searchThisArea) dom.searchThisArea.hidden = true;
+        const generation = startNewSearchGeneration();
+        showLoadingState();
+        loadNearby(center, generation);
+    }
+
+    async function loadNearby(origin, generation) {
+        try {
+            const shops = await fetchNearbyShops(origin.lat, origin.lon);
+            if (generation !== searchGeneration) return;
+            hideLoadingState();
+            nearby = { origin, shops, radiusMi: null };
+            renderNearby();
+        } catch (error) {
+            nearbyFailed(generation, error, 'Could not fetch nearby coffee shops.');
+        }
+    }
+
+    // On failure, go back to browsing by state rather than leaving an empty
+    // "Search Results" section.
+    function nearbyFailed(generation, error, message) {
+        if (generation !== searchGeneration) return;
+        hideLoadingState();
+        handleError(error, 'findNearbyShops');
+        hideNearbyPanel();
+        if (dom.searchResultsContainer) {
+            dom.searchResultsContainer.style.display = 'none';
+        }
+        restoreStateGridVisibility();
+        showUserError(message);
+    }
+
+    /** Draw `nearby` (filtered by its radius) in the list, chips and map. */
+    function renderNearby() {
+        const { origin, shops, radiusMi } = nearby;
+        const visible = radiusMi == null
+            ? shops
+            : shops.filter((shop) => shop.distanceKm <= radiusMi * CONSTANTS.KM_PER_MILE);
+
+        if (dom.nearbyPanel) {
+            dom.nearbyPanel.hidden = false;
+            dom.nearbyPanel.querySelectorAll('.radius-chip').forEach((chip) => {
+                const chipRadius = chip.dataset.radius ? Number(chip.dataset.radius) : null;
+                chip.setAttribute('aria-pressed', String(chipRadius === radiusMi));
+            });
+        }
+
+        // Subscriber on 'lastSearchResults' calls displayResults.
+        store.set('lastSearchResults', {
+            shops: visible, total: visible.length, page: 1, hasNext: false, query: null, nearby: true
+        });
+
+        showNearbyMap(origin, visible);
+    }
+
+    function showNearbyMap(origin, shops) {
+        if (!dom.nearbyMap) return;
+        if (!nearbyMap) {
+            const mapModule = window.CoffeeShopNearbyMap;
+            if (!mapModule) {
+                dom.nearbyMap.hidden = true;
+                return;
+            }
+            nearbyMap = mapModule.createNearbyMap(dom.nearbyMap, {
+                onUserMove(center) {
+                    pendingAreaCenter = center;
+                    if (dom.searchThisArea) dom.searchThisArea.hidden = false;
+                },
+            });
+        }
+        dom.nearbyMap.hidden = false;
+        nearbyMap.show({ origin, shops }).catch((error) => {
+            // The list still works without the map (e.g. tiles blocked).
+            handleError(error, 'nearbyMap');
+            dom.nearbyMap.hidden = true;
+        });
+    }
+
+    function setNearbyRadius(event) {
+        const chip = event.target.closest('.radius-chip');
+        if (!chip || !nearby) return;
+        nearby.radiusMi = chip.dataset.radius ? Number(chip.dataset.radius) : null;
+        renderNearby();
+    }
+
+    function hideNearbyPanel() {
+        nearby = null;
+        pendingAreaCenter = null;
+        if (dom.nearbyPanel) dom.nearbyPanel.hidden = true;
+        if (dom.searchThisArea) dom.searchThisArea.hidden = true;
     }
 
     /**
@@ -1049,12 +1138,21 @@
         dom.stateFilter = document.getElementById('stateFilter');
         dom.priceFilter = document.getElementById('priceFilter');
         dom.findNearMe = document.getElementById('findNearMe');
+        dom.nearbyPanel = document.getElementById('nearbyPanel');
+        dom.nearbyMap = document.getElementById('nearbyMap');
+        dom.searchThisArea = document.getElementById('searchThisArea');
 
         // Validate required elements exist
         const requiredElements = ['stateGrid'];
         const missingElements = requiredElements.filter(id => !dom[id]);
         if (dom.findNearMe) {
             dom.findNearMe.addEventListener('click', findNearbyShops);
+        }
+        if (dom.nearbyPanel) {
+            dom.nearbyPanel.addEventListener('click', setNearbyRadius);
+        }
+        if (dom.searchThisArea) {
+            dom.searchThisArea.addEventListener('click', searchThisArea);
         }
 
         if (missingElements.length > 0) {

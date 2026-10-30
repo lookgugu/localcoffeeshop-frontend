@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://www.googletagmanager.com https://*.google-analytics.com https://*.g.doubleclick.net https://*.google.com; connect-src 'self' https://api.localcoffeeshop.co http://localhost:3000 https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com https://*.g.doubleclick.net https://*.google.com https://pagead2.googlesyndication.com; frame-src 'self' https://www.googletagmanager.com; object-src 'none'; base-uri 'self'; form-action 'self'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://www.googletagmanager.com https://*.google-analytics.com https://*.g.doubleclick.net https://*.google.com; connect-src 'self' https://api.localcoffeeshop.co http://localhost:3000 https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com https://*.g.doubleclick.net https://*.google.com https://pagead2.googlesyndication.com https://tiles.openfreemap.org; worker-src 'self'; frame-src 'self' https://www.googletagmanager.com; object-src 'none'; base-uri 'self'; form-action 'self'">
     <meta name="referrer" content="strict-origin-when-cross-origin">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
@@ -121,6 +121,19 @@
         <p class="coverage-notice" role="note">This directory is not exhaustive, and details like hours, addresses and websites can change. Please check with the shop before you visit. Spot something wrong or missing? <a href="/submit.html">Suggest a correction</a>.</p>
 
         <p class="roasters-callout">Buying beans? <a href="/roasters/">Browse local roasters that sell coffee online</a>, starting with Massachusetts and New England.</p>
+
+        <!-- Find Near Me: distance filter and map (public/nearby-map.js, #30) -->
+        <section id="nearbyPanel" class="nearby-panel" aria-label="Coffee shops near you" hidden>
+            <div class="nearby-controls" role="group" aria-label="Show shops within">
+                <span class="nearby-controls-label">Within</span>
+                <button type="button" class="radius-chip" data-radius="1" aria-pressed="false">1 mi</button>
+                <button type="button" class="radius-chip" data-radius="5" aria-pressed="false">5 mi</button>
+                <button type="button" class="radius-chip" data-radius="15" aria-pressed="false">15 mi</button>
+                <button type="button" class="radius-chip" data-radius="" aria-pressed="true">Any distance</button>
+                <button type="button" id="searchThisArea" class="button-secondary search-this-area" hidden>Search this area</button>
+            </div>
+            <div id="nearbyMap" class="nearby-map" role="region" aria-label="Map of nearby coffee shops"></div>
+        </section>
 
         <!-- Search results -->
         <section
