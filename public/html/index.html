@@ -13,6 +13,14 @@
     <link rel="dns-prefetch" href="https://api.localcoffeeshop.co">
     <link rel="preconnect" href="https://www.googletagmanager.com">
 
+    <!-- Start fetching the scripts at the end of <body> now, in parallel.
+         Without these hints the parser-blocking ones were fetched one after
+         another, one mobile round trip each. -->
+    <link rel="preload" href="/geo-consent-default.js" as="script">
+    <link rel="preload" href="/url-privacy.js" as="script">
+    <link rel="preload" href="/analytics-init.js" as="script">
+    <link rel="preload" href="/dist/app.bundle.min.js" as="script">
+
     <meta name="description" content="Discover local coffee shops across the United States. Search by state, city, and price level. Find the best local cafes near you.">
     <meta name="keywords" content="coffee shops, local coffee, cafes, coffee near me, US coffee shops, coffee directory">
     <meta name="author" content="Local Coffee Shops">
@@ -42,27 +50,6 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 
     <link rel="stylesheet" href="/dist/styles.min.css">
-
-    <!-- Configuration (generated at build time) -->
-    <script src="/config.js"></script>
-
-    <!-- Order is load-bearing: the consent default is queued first, then
-         url-privacy.js scrubs the address bar, then analytics-init.js
-         configures the tag with sanitised page_location / page_referrer (and
-         does not configure it at all if that helper is unavailable). -->
-    <script src="/geo-consent-default.js"></script>
-    <script src="/url-privacy.js"></script>
-    <script src="/analytics-init.js"></script>
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-YVSXN7PM48"></script>
-
-    <!-- Page JS: declared in markup so the preload scanner fetches it in
-         parallel; defer keeps it off the critical rendering path and runs it
-         in this order after parsing. /dist/app.bundle.min.js bundles the page code
-         with its deps (scripts/build-js.cjs). -->
-    <script defer src="/consent-banner.js"></script>
-    <script defer src="/analytics-events.js"></script>
-    <script defer src="/dist/app.bundle.min.js"></script>
-    <script defer src="/waitlist.js"></script>
 
     <!-- Schema.org JSON-LD -->
     <script type="application/ld+json">
@@ -178,5 +165,30 @@
             <p class="waitlist-privacy">We'll send one email asking you to confirm, and you're not on the list until you do. We use your address only for this, through our email provider, Resend. <a href="/pages/privacy.html#waitlist">How we handle it</a> · <a href="/pages/contact.html">Questions or support</a></p>
         </section>
     </main>
+
+    <!-- All scripts sit at the end of <body> so the page paints before the
+         parser-blocking ones run (the preloads in <head> fetch them early).
+         They still run, in this order, before any other page script. -->
+
+    <!-- Configuration (generated at build time) -->
+    <script src="/config.js"></script>
+
+    <!-- Order is load-bearing: the consent default is queued first, then
+         url-privacy.js scrubs the address bar, then analytics-init.js
+         configures the tag with sanitised page_location / page_referrer (and
+         does not configure it at all if that helper is unavailable). -->
+    <script src="/geo-consent-default.js"></script>
+    <script src="/url-privacy.js"></script>
+    <script src="/analytics-init.js"></script>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-YVSXN7PM48"></script>
+
+    <!-- Page JS: declared in markup so the preload scanner fetches it in
+         parallel; defer keeps it off the critical rendering path and runs it
+         in this order after parsing. /dist/app.bundle.min.js bundles the page code
+         with its deps (scripts/build-js.cjs). -->
+    <script defer src="/consent-banner.js"></script>
+    <script defer src="/analytics-events.js"></script>
+    <script defer src="/dist/app.bundle.min.js"></script>
+    <script defer src="/waitlist.js"></script>
 </body>
 </html> 
