@@ -31,6 +31,10 @@
  *   only *.google.com is listed (a non-.com hit is dropped, nothing breaks).
  * - fonts.googleapis.com / fonts.gstatic.com: Source Sans Pro on about and
  *   contact pages.
+ * - tiles.openfreemap.org: map style, vector tiles, fonts and sprites for
+ *   the "Find Near Me" map (public/nearby-map.js, #30). MapLibre fetches
+ *   them all, and decodes sprite images from blob: URLs. MapLibre's CSP
+ *   build loads its worker from /vendor, hence worker-src 'self' (no blob:).
  * - api.localcoffeeshop.co: the API (API_BASE_URL in .do/app-spec.yaml).
  *   http://localhost:3000 is the documented local-dev API (README), so
  *   `npm run dev` against a local backend keeps working.
@@ -45,8 +49,9 @@ const CSP_DIRECTIVES = [
     "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: https://www.googletagmanager.com https://*.google-analytics.com https://*.g.doubleclick.net https://*.google.com",
-    "connect-src 'self' https://api.localcoffeeshop.co http://localhost:3000 https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com https://*.g.doubleclick.net https://*.google.com https://pagead2.googlesyndication.com",
+    "img-src 'self' data: blob: https://www.googletagmanager.com https://*.google-analytics.com https://*.g.doubleclick.net https://*.google.com",
+    "connect-src 'self' https://api.localcoffeeshop.co http://localhost:3000 https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com https://*.g.doubleclick.net https://*.google.com https://pagead2.googlesyndication.com https://tiles.openfreemap.org",
+    "worker-src 'self'",
     "frame-src 'self' https://www.googletagmanager.com",
     "object-src 'none'",
     "base-uri 'self'",
