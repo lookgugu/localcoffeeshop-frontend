@@ -192,7 +192,12 @@
                     });
                     resolve();
                 });
-            }));
+            })).catch((error) => {
+                // Any failed init (library download, style) is retried by
+                // the next show() instead of replaying this rejection.
+                ready = null;
+                throw error;
+            });
             return ready;
         }
 

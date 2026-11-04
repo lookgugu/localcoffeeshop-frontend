@@ -55,6 +55,22 @@ describe('nearby map', () => {
     }
   });
 
+  it('retries downloading MapLibre after a failed download', async () => {
+    const scripts = [];
+    const doc = {
+      head: { appendChild: (el) => { if (el.tag === 'script') scripts.push(el); } },
+      createElement: (tag) => ({ tag }),
+    };
+    const nearbyMap = createNearbyMap({ ownerDocument: doc });
+
+    const first = nearbyMap.show({ origin: { lat: 0, lon: 0 }, shops: [] });
+    scripts[0].onerror();
+    await expect(first).rejects.toThrow('Could not load the map library');
+
+    nearbyMap.show({ origin: { lat: 0, lon: 0 }, shops: [] }).catch(() => {});
+    expect(scripts).toHaveLength(2); // asked for the script again
+  });
+
   it('loads the same MapLibre version that is installed', () => {
     expect(mapModuleVersion()).toBe(MAPLIBRE_VERSION);
     expect(installedVersion()).toBe(MAPLIBRE_VERSION);
