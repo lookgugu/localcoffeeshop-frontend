@@ -308,6 +308,45 @@ describe('frontend.js — Find Near Me', () => {
       expect(document.getElementById('nearbyPanel').hidden).toBe(true);
     });
 
+    it('drops a stale "Search this area" when a distance chip refits the map', async () => {
+      const map = installFakeMap();
+      await boot(nearbyOk());
+      click(document.getElementById('findNearMe'));
+      await waitFor(() => expect(results()).toHaveLength(3));
+
+      map.options.onUserMove({ lat: 40.0, lon: -75.0 });
+      expect(document.getElementById('searchThisArea').hidden).toBe(false);
+      click(chip('5 mi'));
+      expect(document.getElementById('searchThisArea').hidden).toBe(true);
+    });
+
+    it('hides the panel when the search fields are cleared or a text search fails', async () => {
+      installFakeMap();
+      await boot(nearbyOk());
+      server.use(http.get('*/api/v1/search', () => HttpResponse.json(
+        { success: false, error: { message: 'boom' } }, { status: 500 }
+      )));
+      await waitFor(() => expect(statesLoaded).toBe(true));
+      await new Promise((r) => setTimeout(r, 20));
+      const panel = document.getElementById('nearbyPanel');
+
+      // Failed text search.
+      click(document.getElementById('findNearMe'));
+      await waitFor(() => expect(results()).toHaveLength(3));
+      input(document.getElementById('searchInput'), 'roasters');
+      await waitFor(() => expect(document.body.textContent).toMatch('Failed to search coffee shops.'));
+      expect(panel.hidden).toBe(true);
+
+      // Fields cleared back to empty.
+      click(document.getElementById('findNearMe'));
+      await waitFor(() => expect(panel.hidden).toBe(false));
+      input(document.getElementById('searchInput'), '');
+      await waitFor(() => expect(panel.hidden).toBe(true));
+      // A chip on the hidden panel doesn't bring old results back.
+      click(chip('1 mi'));
+      expect(document.getElementById('searchResults').style.display).toBe('none');
+    });
+
     it('still lists nearby shops when the map module is missing', async () => {
       await boot(nearbyOk());
       click(document.getElementById('findNearMe'));

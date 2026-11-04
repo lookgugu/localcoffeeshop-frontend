@@ -328,12 +328,13 @@
     }
 
     /**
-     * Initial data load: health check, then the state list. On failure the
-     * page explains why and offers a retry (#25). Returns true on success.
+     * Initial data load: the state list. On failure the page explains why and
+     * offers a retry (#25). Returns true on success. No separate /health call
+     * first: /states fails the same ways, and the extra cross-origin round
+     * trip delayed the grid by one mobile RTT.
      */
     async function loadDirectory() {
         try {
-            await api.get('/health');
             await initializeStateList();
         } catch (error) {
             handleError(error, 'loadDirectory');
@@ -847,6 +848,9 @@
         // A new search supersedes every in-flight request for the old one
         // (its first page or a "Load More" page) and its pagination cursor.
         const generation = startNewSearchGeneration();
+        // A text search leaves nearby mode on every path (results, cleared
+        // fields, failure), so the map and distance chips go too.
+        hideNearbyPanel();
 
         // Mirror only the categorical filters to the URL. The search text is
         // never written there: GA reads page_location on history changes and
@@ -963,6 +967,10 @@
     /** Draw `nearby` (filtered by its radius) in the list, chips and map. */
     function renderNearby() {
         const { origin, shops, radiusMi } = nearby;
+        // The map refits around the search origin, so an earlier pan no
+        // longer matches what's on screen.
+        pendingAreaCenter = null;
+        if (dom.searchThisArea) dom.searchThisArea.hidden = true;
         const visible = radiusMi == null
             ? shops
             : shops.filter((shop) => shop.distanceKm <= radiusMi * CONSTANTS.KM_PER_MILE);

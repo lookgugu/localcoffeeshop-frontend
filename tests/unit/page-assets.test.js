@@ -34,9 +34,10 @@ const BLOCKING_SCRIPTS = {
 
 const DEP_GLOBALS = ['CoffeeShopEnums', 'CoffeeShopSkeleton', 'ApiClient', 'CoffeeShopStore', 'CoffeeShopActions'];
 
-function head(page) {
-  const html = readFileSync(join(PUBLIC, page), 'utf8');
-  return html.slice(0, html.indexOf('</head>'));
+// The whole page, not just <head>: the homepage declares its scripts at the
+// end of <body> so it paints before the parser-blocking ones run.
+function markup(page) {
+  return readFileSync(join(PUBLIC, page), 'utf8');
 }
 
 /** <script> tags in document order as { src, defer, async, inline }. */
@@ -74,7 +75,7 @@ function runBundle(code, filename) {
 }
 
 describe.each(Object.entries(PAGES))('%s', (page, { bundle, pageCode }) => {
-  const html = head(page);
+  const html = markup(page);
   const tags = scripts(html);
   const sameOrigin = tags.filter((t) => t.src && t.src.startsWith('/'));
 

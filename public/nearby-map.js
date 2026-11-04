@@ -143,7 +143,8 @@
 
         function init() {
             if (ready) return ready;
-            ready = loadLibrary(doc).then((maplibregl) => new Promise((resolve) => {
+            ready = loadLibrary(doc).then((maplibregl) => new Promise((resolve, reject) => {
+                let loaded = false;
                 map = new maplibregl.Map({
                     container,
                     style: STYLE_URL,
@@ -153,7 +154,18 @@
                     attributionControl: { compact: true },
                 });
                 map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+                // A failed style request never fires 'load'. Fail init so the
+                // caller can fall back to the list, and let the next show()
+                // retry. Errors after load (a missing tile) are not fatal.
+                map.on('error', (e) => {
+                    if (loaded) return;
+                    map.remove();
+                    map = null;
+                    ready = null;
+                    reject(e.error || new Error('The map failed to load'));
+                });
                 map.on('load', () => {
+                    loaded = true;
                     addLayers(map);
                     map.on('click', 'clusters', async (e) => {
                         const feature = e.features[0];

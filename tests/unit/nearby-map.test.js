@@ -9,7 +9,7 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 await import('../../public/nearby-map.js');
-const { toGeoJSON, MAPLIBRE_VERSION } = globalThis.CoffeeShopNearbyMap;
+const { toGeoJSON, createNearbyMap, MAPLIBRE_VERSION } = globalThis.CoffeeShopNearbyMap;
 const { installedVersion, mapModuleVersion } = require('../../scripts/copy-vendor.cjs');
 
 describe('nearby map', () => {
@@ -26,6 +26,33 @@ describe('nearby map', () => {
       { type: 'Feature', geometry: { type: 'Point', coordinates: [-74.0, 40.7] },
         properties: { id: 3, name: 'Coffee shop', address: '' } },
     ]);
+  });
+
+  it('rejects show() when the map style fails to load, and retries on the next show()', async () => {
+    const maps = [];
+    globalThis.maplibregl = {
+      Map: class {
+        constructor() { this.handlers = {}; this.removed = false; maps.push(this); }
+        addControl() {}
+        on(event, handler) { this.handlers[event] = handler; }
+        remove() { this.removed = true; }
+      },
+      NavigationControl: class {},
+    };
+    try {
+      const nearbyMap = createNearbyMap({ ownerDocument: {} });
+      const first = nearbyMap.show({ origin: { lat: 0, lon: 0 }, shops: [] });
+      await new Promise((r) => setTimeout(r, 0));
+      maps[0].handlers.error({ error: new Error('style 503') });
+      await expect(first).rejects.toThrow('style 503');
+      expect(maps[0].removed).toBe(true);
+
+      nearbyMap.show({ origin: { lat: 0, lon: 0 }, shops: [] }).catch(() => {});
+      await new Promise((r) => setTimeout(r, 0));
+      expect(maps).toHaveLength(2);
+    } finally {
+      delete globalThis.maplibregl;
+    }
   });
 
   it('loads the same MapLibre version that is installed', () => {
