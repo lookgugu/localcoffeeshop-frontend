@@ -1,0 +1,274 @@
+{
+  "version": 1,
+  "state": "MA",
+  "retrievedAt": "2026-11-02",
+  "source": "Google Business Profile (GMB) / Google Maps",
+  "roasters": [
+    {
+      "id": "atomic-coffee-roasters",
+      "name": "Atomic Coffee Roasters",
+      "city": "Peabody",
+      "state": "MA",
+      "website": "https://atomicroastery.com/",
+      "locations": [
+        {
+          "name": "Atomic Coffee Roasters (Roastery & HQ)",
+          "type": "roastery",
+          "address": "5B Webster St, Peabody, MA 01960",
+          "googleMapsUrl": "https://www.google.com/maps/search/?api=1&query=Atomic+Coffee+Roasters+5B+Webster+St+Peabody+MA+01960",
+          "rating": 4.6,
+          "reviewCountApprox": 20,
+          "highlights": [
+            "Beans roasted fresh to order and available just days off-roast",
+            "Smooth, bold blends (such as Diesel Dark and French Roast) without harsh bitterness",
+            "Highly praised nitro and cold brew options ('no sugar or cream needed')",
+            "Passionate, welcoming staff focused on coffee education"
+          ],
+          "sampleReviews": [
+            "Cold brews are smooth enough to enjoy with no sugar or cream needed.",
+            "Freshly roasted beans with bold, complex flavor and a welcoming, community-driven team."
+          ]
+        },
+        {
+          "name": "Atomic Cafe (Flagship Storefront)",
+          "type": "cafe",
+          "address": "268 Cabot St, Beverly, MA 01915",
+          "googleMapsUrl": "https://www.google.com/maps/search/?api=1&query=Atomic+Cafe+268+Cabot+St+Beverly+MA+01915",
+          "rating": 4.4,
+          "reviewCountApprox": 750,
+          "highlights": [
+            "Vibrant, eclectic retro ambiance and community hub in downtown Beverly since 1996",
+            "Consistent specialty espresso drinks, lattes, and rotating drip selections",
+            "Popular breakfast sandwiches, paninis, and vegan/vegetarian grain bowls",
+            "Great soundtrack and comfortable booth seating"
+          ],
+          "sampleReviews": [
+            "The ambiance radiates a welcoming warmth, enhanced by the vibrant, eclectic decor that captivates and charms.",
+            "Yeah the coffee is great, but the soundtrack is always solid too."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "barismo",
+      "name": "barismo",
+      "city": "Arlington",
+      "state": "MA",
+      "website": "https://www.barismo.com/",
+      "locations": [
+        {
+          "name": "Barismo 171 (Roastery & Coffee Bar)",
+          "type": "roastery_and_cafe",
+          "address": "171 Massachusetts Ave, Arlington, MA 02474",
+          "googleMapsUrl": "https://www.google.com/maps/search/?api=1&query=Barismo+171+Massachusetts+Ave+Arlington+MA+02474",
+          "rating": 3.8,
+          "reviewCountApprox": 150,
+          "highlights": [
+            "Cozy neighborhood roastery with on-site roasting and retail bean/equipment lab",
+            "Carefully dialed-in espresso drinks and V60 pour-overs",
+            "Pleasant outdoor seating when weather permits, though indoor space is compact"
+          ],
+          "sampleReviews": [
+            "This cozy Arlington spot roasts its own beans on-site and shines with expertly pulled espresso drinks... exactly the kind of neighborhood roastery that rewards repeat visits.",
+            "Great local roasters serving great coffee roasted on premise. This store does not have a ton of room inside, and would be a great place for a shorter stop for a top notch coffee."
+          ]
+        },
+        {
+          "name": "Barismo (Cambridge Flagship / formerly Dwelltime)",
+          "type": "cafe",
+          "address": "364 Broadway, Cambridge, MA 02139",
+          "googleMapsUrl": "https://www.google.com/maps/search/?api=1&query=Barismo+364+Broadway+Cambridge+MA+02139",
+          "rating": 3.7,
+          "reviewCountApprox": 650,
+          "highlights": [
+            "Serious, craft-focused roasting and precision temperature/extraction control",
+            "In-house bakery counter inside a historic Mid-Cambridge building",
+            "Trade-offs noted by reviewers include limited laptop/lounge seating and strict retail policies"
+          ],
+          "sampleReviews": [
+            "Many people who think they know a lot about coffee stand corrected once they come to barismo... Every single detail of your coffee is perfect, down to its temperature."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "broadsheet-coffee-roasters",
+      "name": "Broadsheet Coffee Roasters",
+      "city": "Cambridge",
+      "state": "MA",
+      "website": "https://broadsheetcoffee.com/",
+      "locations": [
+        {
+          "name": "Broadsheet Coffee Roasters",
+          "type": "roastery_and_cafe",
+          "address": "100 Kirkland St, Cambridge, MA 02138",
+          "googleMapsUrl": "https://www.google.com/maps/search/?api=1&query=Broadsheet+Coffee+Roasters+100+Kirkland+St+Cambridge+MA+02138",
+          "rating": 4.6,
+          "reviewCountApprox": 850,
+          "highlights": [
+            "Widely regarded as some of the best purist, single-origin specialty coffee in Cambridge",
+            "Bright, airy modern interior with floor-to-ceiling windows and natural light",
+            "Standout rotating pastries (cinnamon rolls, muesli, savory breakfast items)",
+            "Very busy on weekends; seating can be competitive during peak hours"
+          ],
+          "sampleReviews": [
+            "Some of the best specialty coffee in Cambridge — a delicious, clean cup of pure coffee.",
+            "Pastries are to die for, and the floor-to-ceiling windows flood the space with natural light."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "fazenda-coffee-roasters",
+      "name": "Fazenda Coffee Roasters",
+      "city": "Dedham",
+      "state": "MA",
+      "website": "https://www.fazendacoffee.com/",
+      "locations": [
+        {
+          "name": "Fazenda Coffee Roasters (Roastery & Local Pickup)",
+          "type": "roastery",
+          "address": "95 Commerce Way, Dedham, MA 02026",
+          "googleMapsUrl": "https://www.google.com/maps/search/?api=1&query=Fazenda+Coffee+Roasters+95+Commerce+Way+Dedham+MA+02026",
+          "rating": 4.5,
+          "reviewCountApprox": 30,
+          "highlights": [
+            "Commercial specialty roasting facility offering 24-hour local order pickup and mail-order subscriptions",
+            "Praised for consistent, fresh-roasted everyday blends like Espresso Blue and decaf offerings",
+            "Accommodating, welcoming staff for customers picking up bean orders in Dedham",
+            "Supplied to prominent Boston-area cafes and regional markets"
+          ],
+          "sampleReviews": [
+            "High quality, fresh-roasted flavor profile with reliable subscriptions and accommodating staff at the Dedham roastery."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "george-howell-coffee",
+      "name": "George Howell Coffee",
+      "city": "Acton",
+      "state": "MA",
+      "website": "https://georgehowellcoffee.com/",
+      "locations": [
+        {
+          "name": "George Howell Coffee Roastery (Acton HQ)",
+          "type": "roastery",
+          "address": "312 School St, Acton, MA 01720",
+          "googleMapsUrl": "https://www.google.com/maps/search/?api=1&query=George+Howell+Coffee+312+School+St+Acton+MA+01720",
+          "rating": 4.6,
+          "reviewCountApprox": 35,
+          "highlights": [
+            "Primary roasting facility and corporate HQ (no prepared drinks served on-site)",
+            "Popular with local customers picking up freshly roasted single-origin bean orders directly",
+            "Knowledgeable staff available to discuss coffee selections and roast profiles"
+          ],
+          "sampleReviews": [
+            "George Howell is on another level. These are by far the best beans... Both mind blowing."
+          ]
+        },
+        {
+          "name": "George Howell Coffee (The Godfrey Hotel Flagship)",
+          "type": "cafe",
+          "address": "505 Washington St, Boston, MA 02111",
+          "googleMapsUrl": "https://www.google.com/maps/search/?api=1&query=George+Howell+Coffee+505+Washington+St+Boston+MA+02111",
+          "rating": 4.5,
+          "reviewCountApprox": 1500,
+          "highlights": [
+            "Flagship Downtown Crossing cafe praised for world-class single-origin pour-overs and espresso",
+            "Sleek interior design and highly trained, educational baristas",
+            "Gets crowded during peak hours with tight table availability"
+          ],
+          "sampleReviews": [
+            "Exceptional quality espresso and pour-overs with knowledgeable baristas who guide you through flavor notes."
+          ]
+        },
+        {
+          "name": "George Howell Coffee (Newtonville)",
+          "type": "cafe",
+          "address": "311 Walnut St, Newton, MA 02460",
+          "googleMapsUrl": "https://www.google.com/maps/search/?api=1&query=George+Howell+Coffee+311+Walnut+St+Newton+MA+02460",
+          "rating": 4.5,
+          "reviewCountApprox": 500,
+          "highlights": [
+            "Original neighborhood cafe (est. 2012) offering a quieter, intimate setting",
+            "Celebrated for rotating single-origin pour-overs and retail bean selection"
+          ],
+          "sampleReviews": [
+            "The coffee is so smooth and the team was very nice!"
+          ]
+        },
+        {
+          "name": "George Howell Coffee (Boston Public Market)",
+          "type": "cafe",
+          "address": "100 Hanover St, Boston, MA 02108",
+          "googleMapsUrl": "https://www.google.com/maps/search/?api=1&query=George+Howell+Coffee+100+Hanover+St+Boston+MA+02108",
+          "rating": 4.0,
+          "reviewCountApprox": 150,
+          "highlights": [
+            "Convenient takeaway coffee bar and retail bean counter inside Boston Public Market"
+          ],
+          "sampleReviews": [
+            "Great spot to grab an elite specialty espresso or bag of beans while exploring the market."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "little-wolf-coffee",
+      "name": "Little Wolf Coffee Roasters",
+      "city": "Ipswich",
+      "state": "MA",
+      "website": "https://littlewolf.coffee/",
+      "locations": [
+        {
+          "name": "Little Wolf Coffee (Cafe & Roastery)",
+          "type": "roastery_and_cafe",
+          "address": "129 High St, Ipswich, MA 01938",
+          "googleMapsUrl": "https://www.google.com/maps/search/?api=1&query=Little+Wolf+Coffee+129+High+St+Ipswich+MA+01938",
+          "rating": 4.8,
+          "reviewCountApprox": 385,
+          "highlights": [
+            "Independent micro-roastery known for bright, refined single-origin coffees and seasonal drinks",
+            "Distinctive blue-and-white aesthetic and cozy, welcoming local sanctuary vibe",
+            "Warm, humorous, and approachable baristas",
+            "Cup sizes follow traditional specialty coffee standards"
+          ],
+          "sampleReviews": [
+            "Great vibe of blue inside and out... this place is definitely awesome, vibe is immaculate and the experience is great as well.",
+            "This cafe has some of the best coffee I've ever had in Massachusetts.",
+            "Staff service is very above average; friendliness, humor, and general built-up atmosphere around the employees were top notch."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "speedwell-coffee",
+      "name": "Speedwell Coffee",
+      "city": "Plymouth",
+      "state": "MA",
+      "website": "https://speedwellcoffee.com/",
+      "locations": [
+        {
+          "name": "Speedwell Coffee Company (Roastery)",
+          "type": "roastery",
+          "address": "208 South Meadow Rd, Plymouth, MA 02360",
+          "googleMapsUrl": "https://www.google.com/maps/search/?api=1&query=Speedwell+Coffee+208+South+Meadow+Rd+Plymouth+MA+02360",
+          "rating": 5.0,
+          "reviewCountApprox": 50,
+          "highlights": [
+            "Perfect 5.0-star rating on Google Maps for small-batch roasting in Plymouth",
+            "Praised for transparent labeling including exact roast dates, origins, and flavor profiles",
+            "Standout medium roasts and signature Nine Bars Espresso Blend ('bold, not burnt, with a clean finish')",
+            "Fast local pickup at the Plymouth roastery and fair pricing"
+          ],
+          "sampleReviews": [
+            "We moved to Plymouth and started buying freshly roasted coffee from Speedwell and love it... The service is excellent, beans are so fresh and tasty, and the prices are fair.",
+            "I'm very impressed by the consistency in their quality and love the medium roasts they produce. Every bag has info about the beans, the roast style, date of when beans were roasted (so important), and flavor profile.",
+            "Speedwell's Nine Bars Espresso Blend is the real deal: smooth, rich, and roasted fresh right here in Plymouth... Bold, not burnt, with a clean finish you can actually taste."
+          ]
+        }
+      ]
+    }
+  ]
+}

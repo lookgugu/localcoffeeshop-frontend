@@ -180,3 +180,75 @@
         display: block;
     }
 } 
+/* Find Near Me: distance chips and map (#30) */
+.nearby-panel {
+    margin: 1.5rem 0 1rem;
+}
+
+.nearby-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.nearby-controls-label {
+    font-weight: 600;
+}
+
+.radius-chip {
+    padding: 0.35rem 0.85rem;
+    border: 1px solid #6f4e37;
+    border-radius: 999px;
+    background: #fff;
+    color: #6f4e37;
+    font: inherit;
+    cursor: pointer;
+}
+
+.radius-chip[aria-pressed="true"] {
+    background: #6f4e37;
+    color: #fff;
+}
+
+.radius-chip:focus-visible,
+.search-this-area:focus-visible {
+    outline: 3px solid #c8a27a;
+    outline-offset: 2px;
+}
+
+.search-this-area {
+    margin-left: auto;
+}
+
+.nearby-map {
+    width: 100%;
+    height: 420px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #f8f4f0;
+}
+
+.nearby-map[hidden] {
+    display: none;
+}
+
+.nearby-map-origin {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #1a73e8;
+    border: 3px solid #fff;
+    box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.35);
+}
+
+@media (max-width: 600px) {
+    .nearby-map {
+        height: 300px;
+    }
+
+    .search-this-area {
+        margin-left: 0;
+    }
+}

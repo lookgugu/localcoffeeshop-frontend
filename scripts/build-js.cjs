@@ -41,7 +41,7 @@ const SHARED = [
 // one to RETIRED_DIST_URLS in tests/unit/page-assets.test.js.
 const BUNDLES = {
     // Homepage (public/html/index.html)
-    'dist/app.bundle.min.js': [...SHARED, 'frontend.js'],
+    'dist/app.bundle.min.js': [...SHARED, 'nearby-map.js', 'frontend.js'],
     // State detail page (public/html/state.html)
     'dist/state.bundle.min.js': [...SHARED, 'html/state.js'],
 };
