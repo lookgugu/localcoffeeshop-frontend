@@ -9,6 +9,30 @@ domains:
   - domain: localcoffeeshop.co
     type: PRIMARY
     zone: localcoffeeshop.co
+  # www is served only to redirect: the API's CORS allows the apex origin
+  # alone, and one canonical host is better for SEO.
+  - domain: www.localcoffeeshop.co
+    type: ALIAS
+    zone: localcoffeeshop.co
+
+# 301 www.localcoffeeshop.co/* -> https://localcoffeeshop.co/* (path and
+# query kept). This rule must stay ahead of the site rule.
+ingress:
+  rules:
+    - match:
+        authority:
+          exact: www.localcoffeeshop.co
+        path:
+          prefix: /
+      redirect:
+        authority: localcoffeeshop.co
+        scheme: https
+        redirect_code: 301
+    - match:
+        path:
+          prefix: /
+      component:
+        name: frontend
 
 # Static site
 static_sites:
@@ -35,10 +59,6 @@ static_sites:
       - key: API_BASE_URL
         value: https://api.localcoffeeshop.co/api/v1
         scope: BUILD_TIME
-
-    # Routes - SPA-like behavior
-    routes:
-      - path: /
 
 # Features
 features:
