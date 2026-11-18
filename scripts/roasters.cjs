@@ -411,7 +411,7 @@ ${renderHead({
 
     <main id="main-content" class="container roasters-page">
         <h1>Local coffee roasters that sell beans</h1>
-        <p class="roasters-intro">Coffee roasters whose own websites sell packaged coffee beans. This is a first, curated collection from ${escapeHtml(stateList)}, part of a nationwide coffee directory.</p>
+        <p class="roasters-intro">Coffee roasters whose own websites sell packaged coffee beans. This is a first, curated collection from ${escapeHtml(stateList)}, part of a nationwide coffee directory. <a href="#waitlist-roasters">Want a monthly box from roasters like these? Join the interest list</a>.</p>
         <p class="coverage-notice" role="note">This list is not exhaustive: it currently covers ${total} ${noun(total)} in ${escapeHtml(stateList)} and will grow. Shipping and pickup are shown only where the roaster's own site says so; "Not confirmed" means we couldn't confirm it, not that it isn't offered. Check the roaster's site before ordering.</p>
 
         <form class="roaster-filters" id="roasterFilters" role="search" aria-label="Filter roasters" hidden>

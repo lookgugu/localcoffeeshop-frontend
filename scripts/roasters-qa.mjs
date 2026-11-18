@@ -198,7 +198,7 @@ async function noJsScenario(browser, name, contextOptions) {
     if (OUT_DIR) await page.screenshot({ path: join(OUT_DIR, `roasters-${name}-nojs.png`), fullPage: true });
 
     await page.goto(`${ORIGIN}/`);
-    const link = page.locator('main a[href="/roasters/"]');
+    const link = page.locator('main .roasters-callout a[href="/roasters/"]');
     check(p('homepage links to directory'), (await link.count()) === 1 && await link.isVisible());
     check(p('no unexpected external requests'), log.unexpected.length === 0, log.unexpected.join('; '));
     await context.close();
