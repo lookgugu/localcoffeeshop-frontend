@@ -110,6 +110,40 @@ describe('ApiClient — retry semantics', () => {
     expect(attempts).toBe(3);
   });
 
+  it('exposes the error envelope as code + serverMessage on ApiHttpError', async () => {
+    server.use(
+      http.post('*/api/v1/closed', () =>
+        HttpResponse.json(
+          { success: false, error: { code: 'SUBMISSIONS_DISABLED', message: 'Closed for now.' } },
+          { status: 503 }
+        )
+      )
+    );
+
+    await expect(api.post('/closed', { a: 1 }, { retries: 0 })).rejects.toMatchObject({
+      name: 'ApiHttpError',
+      status: 503,
+      code: 'SUBMISSIONS_DISABLED',
+      serverMessage: 'Closed for now.',
+      // message stays the technical one, so existing callers are unaffected
+      message: expect.stringMatching(/^HTTP 503 for /),
+    });
+  });
+
+  it('adds no envelope fields when a non-2xx body is not the API envelope', async () => {
+    server.use(
+      http.get('*/api/v1/html-error', () =>
+        new HttpResponse('<h1>Bad Gateway</h1>', { status: 404, headers: { 'Content-Type': 'text/html' } })
+      )
+    );
+
+    const err = await api.get('/html-error', { retries: 0 }).catch((e) => e);
+    expect(err).toBeInstanceOf(ApiHttpError);
+    expect(err.status).toBe(404);
+    expect(err.code).toBeUndefined();
+    expect(err.serverMessage).toBeUndefined();
+  });
+
   it('gives up after the configured retry count and throws ApiHttpError', async () => {
     let attempts = 0;
     server.use(

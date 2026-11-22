@@ -179,6 +179,25 @@
     return json;
   }
 
+  // Pull `{ code, serverMessage }` out of a non-2xx body shaped like the API's
+  // error envelope (`{ success: false, error: { code, message } }`), so callers
+  // can show the server's human-readable message instead of "HTTP 503 for …".
+  // Anything else (HTML error pages, empty bodies) yields no extra fields.
+  function _errorEnvelopeFields(bodyText) {
+    let json;
+    try {
+      json = JSON.parse(bodyText);
+    } catch (_) {
+      return {};
+    }
+    const err = json && typeof json === 'object' ? json.error : null;
+    if (!err || typeof err !== 'object') return {};
+    const fields = {};
+    if (typeof err.code === 'string' && err.code) fields.code = err.code;
+    if (typeof err.message === 'string' && err.message) fields.serverMessage = err.message;
+    return fields;
+  }
+
   // Shape the caller sees: bare `data` by default, `{data, metadata}` when
   // the caller opted in with `withMeta: true`.
   function _shapeResult(envelope, opts) {
@@ -267,11 +286,11 @@
       const isRetryable = response.status >= 500 || response.status === 429;
       if (!isRetryable || attempt === totalAttempts - 1) {
         const bodyText = await response.text().catch(() => '');
-        throw new ApiHttpError(`HTTP ${response.status} for ${url}`, {
+        throw new ApiHttpError(`HTTP ${response.status} for ${url}`, Object.assign({
           url,
           status: response.status,
           body: bodyText,
-        });
+        }, _errorEnvelopeFields(bodyText)));
       }
       lastErr = new ApiHttpError(`HTTP ${response.status} for ${url}`, {
         url, status: response.status,
