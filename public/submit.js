@@ -34,11 +34,14 @@ function generateIdempotencyKey() {
 /**
  * Turn a failed submit into a message a visitor can act on. Prefers the
  * API's own message (e.g. "Community submissions are temporarily closed"),
- * which the client exposes as `serverMessage`; falls back to plain-English
+ * which the client exposes as `serverMessage` on HTTP errors and as the
+ * message of an envelope error; falls back to plain-English
  * text for rate limits and connection problems instead of "HTTP 503 for …".
  */
 function submissionErrorMessage(error, fallback) {
-    const { ApiHttpError, ApiNetworkError, ApiTimeoutError } = api.errors;
+    const { ApiHttpError, ApiEnvelopeError, ApiNetworkError, ApiTimeoutError } = api.errors;
+    // 2xx with `{ success: false }`: the message is the server's own text.
+    if (error instanceof ApiEnvelopeError) return error.message || fallback;
     if (error instanceof ApiHttpError) {
         if (error.serverMessage) return error.serverMessage;
         if (error.status === 429) {

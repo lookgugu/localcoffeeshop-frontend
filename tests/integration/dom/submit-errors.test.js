@@ -100,6 +100,17 @@ describe('submit page — error messages', () => {
     expect(await submitAddAndReadError()).toBe(message);
   });
 
+  it('shows the server message from a 2xx { success: false } envelope', async () => {
+    const message = 'This shop is already in the review queue.';
+    server.use(
+      http.post('*/api/v1/coffee-shops', () =>
+        HttpResponse.json({ success: false, error: { message } }, { status: 200 })
+      )
+    );
+
+    expect(await submitAddAndReadError()).toBe(message);
+  });
+
   it('falls back to plain English when a 503 has no envelope (e.g. a proxy error page)', async () => {
     server.use(
       http.post('*/api/v1/coffee-shops', () =>
