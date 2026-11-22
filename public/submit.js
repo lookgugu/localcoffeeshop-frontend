@@ -31,6 +31,46 @@ function generateIdempotencyKey() {
 }
 
 // Function to extract state code from filename
+/**
+ * Turn a failed submit into a message a visitor can act on. Prefers the
+ * API's own message (e.g. "Community submissions are temporarily closed"),
+ * which the client exposes as `serverMessage` on HTTP errors and as the
+ * message of an envelope error; falls back to plain-English
+ * text for rate limits and connection problems instead of "HTTP 503 for …".
+ */
+function submissionErrorMessage(error, fallback) {
+    const { ApiHttpError, ApiEnvelopeError, ApiNetworkError, ApiTimeoutError } = api.errors;
+    // 2xx with `{ success: false }`: the message is the server's own text.
+    if (error instanceof ApiEnvelopeError) return error.message || fallback;
+    if (error instanceof ApiHttpError) {
+        if (error.serverMessage) return error.serverMessage;
+        if (error.status === 429) {
+            return 'Too many submissions from your connection. Please try again later.';
+        }
+        if (error.status === 503) {
+            return 'Submissions are temporarily unavailable. Please try again later.';
+        }
+        return fallback;
+    }
+    if (error instanceof ApiNetworkError || error instanceof ApiTimeoutError) {
+        return "We couldn't reach the server. Check your connection and try again.";
+    }
+    return fallback;
+}
+
+/**
+ * Show one outcome for a form: hide the other message first, so a stale
+ * success or error never sits next to the new one.
+ */
+function showFormMessage(shownId, hiddenId, text) {
+    const hidden = document.getElementById(hiddenId);
+    if (hidden) hidden.style.display = 'none';
+    const shown = document.getElementById(shownId);
+    if (!shown) return;
+    if (text !== undefined) shown.textContent = text;
+    shown.style.display = 'block';
+}
+
 function getStateFromFilename(filename) {
     const match = filename.match(/state_([a-z]{2})\.json$/);
     return match ? match[1].toUpperCase() : null;
@@ -261,8 +301,8 @@ async function handleAddSubmit(event) {
         await api.post('/coffee-shops', { shop: newShop }, { idempotencyKey });
 
         // Show success message
+        showFormMessage('add-success', 'add-error');
         const successMessage = document.getElementById('add-success');
-        successMessage.style.display = 'block';
 
         // Reset form
         resetForm('add-form');
@@ -273,11 +313,8 @@ async function handleAddSubmit(event) {
         }, 3000);
     } catch (error) {
         console.error('Error adding coffee shop:', error);
-        const errorMessage = document.getElementById('add-error');
-        errorMessage.textContent = (error && error.message)
-            ? error.message
-            : 'Error adding coffee shop. Please try again.';
-        errorMessage.style.display = 'block';
+        showFormMessage('add-error', 'add-success',
+            submissionErrorMessage(error, 'Error adding coffee shop. Please try again.'));
     }
 }
 
@@ -326,8 +363,8 @@ async function handleUpdateSubmit(event) {
         await api.put(`/coffee-shops/${id}`, { shop: updatedShop }, { idempotencyKey });
 
         // Show success message
+        showFormMessage('update-success', 'update-error');
         const successMessage = document.getElementById('update-success');
-        successMessage.style.display = 'block';
 
         // Reset form
         resetForm('update-form');
@@ -338,11 +375,8 @@ async function handleUpdateSubmit(event) {
         }, 3000);
     } catch (error) {
         console.error('Error updating coffee shop:', error);
-        const errorMessage = document.getElementById('update-error');
-        errorMessage.textContent = (error && error.message)
-            ? error.message
-            : 'Error updating coffee shop. Please try again.';
-        errorMessage.style.display = 'block';
+        showFormMessage('update-error', 'update-success',
+            submissionErrorMessage(error, 'Error updating coffee shop. Please try again.'));
     }
 }
 
